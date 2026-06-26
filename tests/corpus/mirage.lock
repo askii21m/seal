@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "compiler": "seal 0.1.0",
+  "target": "bitcoin-mainnet-tapscript-v1",
+  "source_sha256": "d446224075518f1af4d71aada843ee00904309048bfa8390dd8ab60382c8eb83",
+  "args_sha256": "c2399173c363793dcd94767655c800f88cdf7614a9af9f5c61ef2cc7ffeed6bd",
+  "externs": {
+    "k": "0x2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c"
+  },
+  "address": "bc1p6gsee2utun2fe35wa4j6ttvuhne59etyvtsrseejkft5lx42uqhqgeewhm",
+  "output_key": "d2219cab8be4d49cc68eed65a5ad9cbcf342e56462e0386732b2574f9aaae02e",
+  "parity": 0,
+  "internal_key": "501c464c6e353a576d03666468fd450925797f678dd2055952578e61247766df",
+  "nums_r": "2d7c8fd0b38298a49962544e8892611759a0b95e284ca3898cc328a5c4793140",
+  "merkle_root": "55d505352982f460d440aa2d10341ff22af4f42ab58f530d9a09e24c266ce2d5",
+  "tweak": "6043f23eb15627cf5e3a767e1bc15b15e59a61120a75d52d88e00eceff3fbae5",
+  "tree": "claim",
+  "leaves": [
+    {
+      "name": "claim",
+      "script": "0002e803a569202b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6cac",
+      "leaf_hash": "55d505352982f460d440aa2d10341ff22af4f42ab58f530d9a09e24c266ce2d5",
+      "depth": 0,
+      "control_block": "c0501c464c6e353a576d03666468fd450925797f678dd2055952578e61247766df",
+      "witness": [
+        "s",
+        "bid"
+      ],
+      "script_bytes": 40,
+      "control_bytes": 33,
+      "witness_elements": 2
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "refund_key": "0x2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c",
+  "swap_key": "0x5cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+  "timelock": { "height": 900000 },
+  "hashlock": "0xabababababababababababababababababababababababababababababababab"
+}

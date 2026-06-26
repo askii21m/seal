@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "compiler": "seal 0.1.0",
+  "target": "bitcoin-mainnet-tapscript-v1",
+  "source_sha256": "1970578a4a02210557d3acdac5adfd8e141612a91f530955b83845c766a63aa2",
+  "args_sha256": "3bb3698b6233ba824addf56e063d078332d28db090c24d0479fb1a0ced9952a5",
+  "externs": {
+    "M": "2",
+    "N": "3",
+    "keys": "[0x2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c, 0x5cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc, 0xf28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8]"
+  },
+  "address": "bc1pv2h8ffhmxgvel8kyeddhtxe5g3dp8dvwjcswyjyzgadykvjmh8cslwex4k",
+  "output_key": "62ae74a6fb32199f9ec4cb5b759b34445a13b58e9620e24882475a4b325bb9f1",
+  "parity": 1,
+  "internal_key": "e2bdbdbb8fcfc4476f4a5fd6388dd43d5ed311e9d7d794611d4969d2edd78efe",
+  "merkle_root": "bdab3f69b208e53c7c02cfcb3d66a76aeb733c0acfc7fae8d338070ed807161e",
+  "tweak": "a554c93d30aff980986c71d27280e0cb69f1480ec91b181bcaf41a8f3de43048",
+  "tree": "fallback",
+  "leaves": [
+    {
+      "name": "fallback",
+      "script": "202b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6cac205cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcba20f28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8ba52a2",
+      "leaf_hash": "bdab3f69b208e53c7c02cfcb3d66a76aeb733c0acfc7fae8d338070ed807161e",
+      "depth": 0,
+      "control_block": "c1e2bdbdbb8fcfc4476f4a5fd6388dd43d5ed311e9d7d794611d4969d2edd78efe",
+      "witness": [
+        "sigs[2]",
+        "sigs[1]",
+        "sigs[0]"
+      ],
+      "script_bytes": 104,
+      "control_bytes": 33,
+      "witness_elements": 3
+    }
+  ]
+}

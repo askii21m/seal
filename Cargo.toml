@@ -1,0 +1,26 @@
+[package]
+name = "seal"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.87"
+authors = ["AskiiDev"]
+description = "A verification language that compiles to Bitcoin tapscript and proves each spend path matches its source."
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/AskiiDev/seal"
+keywords = ["bitcoin", "tapscript", "taproot", "compiler", "verification"]
+categories = ["cryptography::cryptocurrencies", "compilers"]
+
+# No third-party dependencies. Every byte of the compiled script must be a pure,
+# auditable function of the source, so the crypto, hashing, and bech32m routines
+# all live in-tree rather than risk a dependency introducing nondeterminism into
+# compilation.
+[dependencies]
+
+[dev-dependencies]
+
+# cfg(kani) gates the machine-checked proof harnesses in src/interp.rs. It is set
+# only under `cargo kani`, never a normal build, so it is declared here to keep
+# the unexpected-cfg lint quiet without pulling in a dependency.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }

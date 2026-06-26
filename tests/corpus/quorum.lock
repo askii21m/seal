@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "compiler": "seal 0.1.0",
+  "target": "bitcoin-mainnet-tapscript-v1",
+  "source_sha256": "553eb5f62d48b4199bb072c5133ac869763cfd6e5eb2329e1ebbb2248afc15ed",
+  "args_sha256": "c2399173c363793dcd94767655c800f88cdf7614a9af9f5c61ef2cc7ffeed6bd",
+  "externs": {
+    "k": "0x2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c"
+  },
+  "address": "bc1pecuh2t7mdvcz88lr8mld7d0tzdqh9npx5tj2axnh3q2rqm9e8zasmrhgfp",
+  "output_key": "ce39752fdb6b30239fe33efedf35eb134172cc26a2e4ae9a778814306cb938bb",
+  "parity": 0,
+  "internal_key": "6bf1e10bd93a20634ed999a3c9f443c4ae55904bfa449b6f59b6eaad8cbd1158",
+  "nums_r": "66ab115d1bb69ebc9385d2d3d72015bfc4e85aa09a2e9b78d8dc0459800e310a",
+  "merkle_root": "2d6e994bc10fad2f8e920e98e7830c7ba00b2f237d0899ed75d83757e6bb2e3b",
+  "tweak": "cd7df17864365938110ba1d47032dbd0036f4fad1d786ea845da274c3dc7c299",
+  "tree": "act",
+  "leaves": [
+    {
+      "name": "act",
+      "script": "007c638b687c638b687c638b687c638b687c638b687c638b687c638b687c638b685357a569202b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6cac",
+      "leaf_hash": "2d6e994bc10fad2f8e920e98e7830c7ba00b2f237d0899ed75d83757e6bb2e3b",
+      "depth": 0,
+      "control_block": "c06bf1e10bd93a20634ed999a3c9f443c4ae55904bfa449b6f59b6eaad8cbd1158",
+      "witness": [
+        "s",
+        "votes[7]",
+        "votes[6]",
+        "votes[5]",
+        "votes[4]",
+        "votes[3]",
+        "votes[2]",
+        "votes[1]",
+        "votes[0]"
+      ],
+      "script_bytes": 71,
+      "control_bytes": 33,
+      "witness_elements": 9
+    }
+  ]
+}

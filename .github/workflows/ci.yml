@@ -1,0 +1,116 @@
+# Continuous integration.
+#
+# `check` and `wasm` run on every push and pull request for fast feedback. The
+# expensive validation, the Bitcoin Core consensus differential and the Kani
+# proofs, runs on pushes to main, on a weekly schedule, and on demand, so a
+# pull request is never blocked on a 40-minute Core build.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: format, lint, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: format
+        run: cargo fmt --all --check
+      - name: clippy (warnings are errors)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: test
+        run: cargo test --workspace
+      - name: fuzz (higher scale)
+        run: BASIS_FUZZ=20 cargo test --test fuzz
+      - name: certify fuzz (certifier and optimizer over generated contracts)
+        run: BASIS_FUZZ=4 cargo test --test certify_fuzz -- --nocapture
+
+  wasm:
+    name: wasm byte-identical cross-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: build native seal
+        run: cargo build --bin seal
+      # Release wasm is the build that ships and the one that exposes
+      # release-only bugs. The cross-check below compares it against the native
+      # build, so any release-vs-debug or wasm-codegen divergence fails CI.
+      - name: build wasm (release; zero-dependency cdylib)
+        run: cargo build --manifest-path seal-wasm/Cargo.toml --target wasm32-unknown-unknown --release
+      - name: wasm smoke test (end to end in a JS runtime)
+        env:
+          WASM: seal-wasm/target/wasm32-unknown-unknown/release/seal_wasm.wasm
+        run: node web/smoke.mjs
+      - name: native vs wasm byte-identical cross-check
+        env:
+          WASM: seal-wasm/target/wasm32-unknown-unknown/release/seal_wasm.wasm
+        run: node web/crosscheck.mjs
+
+  proofs:
+    name: kani proofs
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: install Kani
+        run: |
+          cargo install --locked kani-verifier
+          cargo kani setup
+      - name: verify proof harnesses
+        run: cargo kani
+
+  differential:
+    name: bitcoin core consensus differential
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-bitcoin-${{ hashFiles('.gitmodules') }}
+      - name: install Bitcoin Core build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libboost-dev libevent-dev pkg-config ccache
+      - name: build bitcoind (vendored submodule)
+        run: |
+          cmake -S vendor/bitcoin -B /tmp/bitcoin-build -DENABLE_WALLET=OFF -DENABLE_IPC=OFF
+          cmake --build /tmp/bitcoin-build --target bitcoind bitcoin-cli -j"$(nproc)"
+      - name: consensus differentials (mandatory, no skip-as-pass)
+        env:
+          BITCOIN_BUILD: /tmp/bitcoin-build
+          BASIS_REQUIRE_CORE: "1"
+        run: |
+          cargo test --test core_consensus_differential -- --nocapture
+          cargo test --test regtest_differential -- --nocapture

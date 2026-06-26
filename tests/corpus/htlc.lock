@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "compiler": "seal 0.1.0",
+  "target": "bitcoin-mainnet-tapscript-v1",
+  "source_sha256": "a220be9ee2b538b2ea171e0c564ee070decd35bde6b74ec40717d15ad115c498",
+  "args_sha256": "f2a350560fc0e8e0a08daec2165459731f7f7f64be85f7e26af71baa585595f9",
+  "externs": {
+    "refund_key": "0x2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c",
+    "swap_key": "0x5cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+    "timelock": "height 900000",
+    "hashlock": "0xabababababababababababababababababababababababababababababababab"
+  },
+  "address": "bc1pn03v6pjm54ex8ayvj2u68rp332xtm4qy845e38qkmmj6fal484rsyklkdk",
+  "output_key": "9be2cd065ba57263f48c92b9a38c318a8cbdd4043d69989c16dee5a4f7f53d47",
+  "parity": 1,
+  "internal_key": "1319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6ea",
+  "merkle_root": "d4851c2aed2eb02ac542b77757f719bff10286c8b05705b6dd2e354d76e32dd1",
+  "tweak": "bed0a9ae31fa6182969fd59b179381892627a14b3401ea5575470996b7800d41",
+  "tree": "branch(swap, refund)",
+  "leaves": [
+    {
+      "name": "swap",
+      "script": "8201209da820abababababababababababababababababababababababababababababababab88205cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "leaf_hash": "cf687ca9f38f25a72e530c1c54e3e6d8357a79cb244441ff5ae1e24678931e57",
+      "depth": 1,
+      "control_block": "c11319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6ea6e7d31830c4600507547ba346af1324f7d6910f11da5293725025aad2314fe83",
+      "witness": [
+        "signature",
+        "preimage"
+      ],
+      "script_bytes": 73,
+      "control_bytes": 65,
+      "witness_elements": 2
+    },
+    {
+      "name": "refund",
+      "script": "03a0bb0db175202b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6cac",
+      "leaf_hash": "6e7d31830c4600507547ba346af1324f7d6910f11da5293725025aad2314fe83",
+      "depth": 1,
+      "control_block": "c11319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6eacf687ca9f38f25a72e530c1c54e3e6d8357a79cb244441ff5ae1e24678931e57",
+      "witness": [
+        "signature"
+      ],
+      "script_bytes": 40,
+      "control_bytes": 65,
+      "witness_elements": 1
+    }
+  ]
+}

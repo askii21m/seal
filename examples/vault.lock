@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "compiler": "seal 0.1.0",
+  "target": "bitcoin-mainnet-tapscript-v1",
+  "source_sha256": "8a806ef9536a6744270b6d61ff9624f96a1d226617c0cbc32e4ee20090efd60b",
+  "args_sha256": "ce7f00903a0497b55af943ec7530d254473684d396a274994076f326d2edcf50",
+  "externs": {
+    "hot": "0x2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c",
+    "cosigner": "0x5cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+    "cold": "0xf28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8"
+  },
+  "address": "bc1pwxhf7hg36zvcf6u5fyzrrvqthv8rqhl0h23nk0ukunyc4yuvfk0s50rr0q",
+  "output_key": "71ae9f5d11d09984eb94490431b00bbb0e305fefbaa33b3f96e4c98a938c4d9f",
+  "parity": 1,
+  "internal_key": "1319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6ea",
+  "merkle_root": "bda0b21bcaf6ffcdde876faaf8c5d16e17d7247194684a980c5c821a1756da15",
+  "tweak": "6775407fccf4320aff592bc6a57b7fd51b2af09622aa396eca1c38d43e90f968",
+  "tree": "branch(fallback, recover)",
+  "leaves": [
+    {
+      "name": "fallback",
+      "script": "02e010b275202b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6cac",
+      "leaf_hash": "caa0dd774f97c3665e11986522f71302ad480259dc9add0b96bf529064ae9d68",
+      "depth": 1,
+      "control_block": "c11319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6ea8845d6892fe23fd2ea4972360e4cb568f2abc8f821281b0c0eba87461414185e",
+      "witness": [
+        "signature"
+      ],
+      "script_bytes": 39,
+      "control_bytes": 65,
+      "witness_elements": 1
+    },
+    {
+      "name": "recover",
+      "script": "02a032b27520f28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8ac",
+      "leaf_hash": "8845d6892fe23fd2ea4972360e4cb568f2abc8f821281b0c0eba87461414185e",
+      "depth": 1,
+      "control_block": "c11319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6eacaa0dd774f97c3665e11986522f71302ad480259dc9add0b96bf529064ae9d68",
+      "witness": [
+        "signature"
+      ],
+      "script_bytes": 39,
+      "control_bytes": 65,
+      "witness_elements": 1
+    }
+  ]
+}
