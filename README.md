@@ -1,4 +1,30 @@
-# Seal
+<p align="center">
+  <img src="assets/selkie.svg" width="116" alt="Selkie, the Seal mascot" />
+</p>
+
+<h1 align="center">Seal</h1>
+
+<p align="center">
+  A language for Bitcoin spending conditions you can read, review, and trust.
+</p>
+
+<p align="center">
+  <a href="#example">Example</a> &nbsp;&middot;&nbsp;
+  <a href="#building">Building</a> &nbsp;&middot;&nbsp;
+  <a href="#how-it-works">How it works</a> &nbsp;&middot;&nbsp;
+  <a href="#compared-to-miniscript">vs. Miniscript</a> &nbsp;&middot;&nbsp;
+  <a href="#status">Status</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/AskiiDev/seal/actions/workflows/ci.yml"><img src="https://github.com/AskiiDev/seal/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  &nbsp;
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/status-alpha-ee9a76.svg" alt="Status: alpha" />
+</p>
+
+---
 
 Seal is a high-level language for writing Bitcoin spending conditions. The
 compiler, `seal`, turns a `.sl` contract into an optimized tapscript tree and a
@@ -165,3 +191,7 @@ yourself before you send anything.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+---
+
+<p align="center"><sub>The seal is <b>Selkie</b>, a nod to the seal-folk of folklore who slip out of their skins to walk ashore.</sub></p>
