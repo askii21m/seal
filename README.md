@@ -91,6 +91,32 @@ Compilation is a pure, deterministic function of the source, the bound values,
 and the compiler version. There is no I/O, clock, or ambient randomness anywhere
 in the pipeline.
 
+## Compared to Miniscript
+
+Miniscript is the established way to write structured, analyzable Bitcoin Script.
+For standard custody (keys, timelocks, hashlocks, thresholds) it is the mature,
+peer-reviewed, widely deployed choice, with generic satisfaction and descriptor
+and wallet integration. If that is your use case, reach for Miniscript.
+
+Seal sits at a different point in the design space:
+
+- Verified compilation, not correct-by-construction. Miniscript is safe because
+  it is a structured view of a known-good subset of Script. Seal compiles a
+  higher-level predicate to arbitrary tapscript and then proves, for that
+  specific output, that the optimized script, a naive reference encoding, and the
+  source predicate all agree across the entire witness domain, with the
+  interpreter cross-checked against Bitcoin Core's consensus engine. The
+  guarantee is about the exact bytes you would fund, not trust in a compiler.
+
+- A more expressive source. Seal predicates include arithmetic, sums, counts, and
+  ranges over witness data, which fall outside Miniscript's fragment set. That
+  expressiveness is also why the per-compile proof exists: the language is not
+  restricted to constructs that are safe by definition.
+
+Seal is alpha and unaudited, with no wallet integration or standardization, and
+Miniscript leads on all three. Treat Seal as a verification-forward experiment,
+not a Miniscript replacement.
+
 ## Layout
 
 ```
