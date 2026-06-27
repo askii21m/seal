@@ -139,9 +139,11 @@ fn hashlock_golden() {
             // (consumed last by CHECKSIG) is deepest.
             // airlock: p is Bytes<32>, SIZE check IN PLACE (p is on top, SIZE
             // is non-consuming), never elided -- no PICK-copy, no DROP.
+            // EQUALVERIFY (SIZE and a minimal push share an encoding; matches
+            // rust-miniscript and the certifier decodes it as a length check).
             Op::Size,
             Op::PushNum(32),
-            Op::NumEqualVerify,
+            Op::EqualVerify,
             // sha256(p) == h: byte equality fuses to EQUALVERIFY
             Op::PushNum(0),
             Op::Pick,
@@ -763,7 +765,7 @@ fn corpus_lowers_clean_and_passes_the_poison_gate() {
     assert_eq!(swap.witness_order, vec!["signature", "preimage"]);
     assert!(contains_subseq(
         &swap.ops,
-        &[Op::Size, Op::PushNum(32), Op::NumEqualVerify] // the preimage airlock
+        &[Op::Size, Op::PushNum(32), Op::EqualVerify] // the preimage airlock
     ));
     assert!(contains_subseq(&swap.ops, &[Op::Sha256, Op::EqualVerify]));
     let refund = htlc.iter().find(|l| l.name == "refund").unwrap();

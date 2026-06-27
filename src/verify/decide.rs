@@ -2435,7 +2435,8 @@ fn pred_to_sym(
     let mut scope: Vec<(String, u32)> = Vec::new();
     let mut accept = a.intern(Node::Const(1));
     // The fixed-length airlocks the lowering emits for sized witness data
-    // (`OP_SIZE <N> NUMEQUALVERIFY` for `Bytes<N>`) are part of the typed
+    // (`OP_SIZE <N> EQUALVERIFY` for `Bytes<N>`, decoded as a numeric length
+    // check -- see decode_to_sym's 0x88 case) are part of the typed
     // predicate's domain: a `Bytes<N>` value IS N bytes. Encode that so the
     // accept-function matches the script over the full witness domain (both
     // reject a wrong-length witness), not just the typed sub-domain.
@@ -3108,10 +3109,24 @@ fn decode_to_sym(a: &mut Arena, script: &[u8], n: usize) -> Option<Decoded> {
                 stack.push(a.intern(Node::Hash(op, v)));
             }
             0x87 | 0x88 => {
-                // OP_EQUAL / OP_EQUALVERIFY: BYTEWISE equality.
+                // OP_EQUAL / OP_EQUALVERIFY: BYTEWISE equality -- EXCEPT the
+                // fixed-length airlock `SIZE <N> EQUALVERIFY`, whose left operand
+                // is a `Size` node. That is a numeric length check: OP_SIZE and a
+                // minimal `<N>` push share an encoding, so it is identical to the
+                // predicate side's `Cmp(0x9c, Size, Const)` (pred_to_sym). Decode
+                // it as that same numeric node so the airlock unifies with the
+                // typed domain; every other EQUAL(VERIFY) stays bytewise.
                 let b = stack.pop()?;
                 let av = stack.pop()?;
-                let eq = a.intern(Node::Eq(av, b));
+                let eq = if matches!(a.nodes[av as usize], Node::Size(_)) {
+                    // Fold the pushed length to a Const (as the 0x9d case does),
+                    // so the node matches pred_to_sym's `Cmp(0x9c, Size, Const)`
+                    // exactly -- a raw Bytes push would never unify.
+                    let bn = sym_num(a, b)?;
+                    a.mk(Node::Cmp(0x9c, av, bn))
+                } else {
+                    a.intern(Node::Eq(av, b))
+                };
                 if op == 0x88 {
                     if in_branch {
                         return None; // a conditional abort is not modelled

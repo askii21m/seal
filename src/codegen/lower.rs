@@ -669,11 +669,16 @@ impl<'a> Lowerer<'a> {
     }
 
     /// The never-elided length airlock. `OP_SIZE` is non-consuming, so when the
-    /// value is already on top we check it IN PLACE -- `SIZE <n> NUMEQUALVERIFY`
-    /// -- with no PICK-copy and no trailing DROP (it stays on the stack for its
+    /// value is already on top we check it IN PLACE -- `SIZE <n> EQUALVERIFY` --
+    /// with no PICK-copy and no trailing DROP (it stays on the stack for its
     /// later consuming use). Off the top it falls back to the copy form
-    /// `PICK SIZE <n> NUMEQUALVERIFY DROP`. (The check itself is never removed --
+    /// `PICK SIZE <n> EQUALVERIFY DROP`. (The check itself is never removed --
     /// proving it redundant would mean inverting the hash; it enforces Bytes<N>.)
+    /// `EQUALVERIFY` (not `NUMEQUALVERIFY`): `OP_SIZE` and a minimal `<n>` push
+    /// share their byte encoding, so the bytewise compare is identical to the
+    /// numeric one for any valid length -- and it matches rust-miniscript. The
+    /// certifier recognises `SIZE <n> EQUALVERIFY` as the numeric length check
+    /// (see `decode_to_sym`), so the proof still unifies with the typed domain.
     fn airlock_size(&mut self, slot: &str, n: i64, span: Span) -> Result<(), ()> {
         let in_place = self.depth_of(slot) == Some(0);
         if !in_place {
@@ -681,7 +686,7 @@ impl<'a> Lowerer<'a> {
         }
         self.emit_op(Op::Size, 0); // pushes len without popping: model +1
         self.emit_push(Op::PushNum(n));
-        self.emit_pop(Op::NumEqualVerify, 2);
+        self.emit_pop(Op::EqualVerify, 2);
         if !in_place {
             self.emit_pop(Op::Drop, 1); // discard the PICK copy
         }
