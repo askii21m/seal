@@ -122,6 +122,9 @@ pub struct CompileResult {
     pub facts: Option<(Report, PathReport)>,
     /// Optimized leaves, present when lowering ran (clean or not).
     pub leaves: Option<Vec<LoweredLeaf>>,
+    /// Per-leaf Miniscript descriptor (aligned to `leaves`), `None` for a leaf
+    /// outside the Miniscript-expressible fragment. Present when lowering ran.
+    pub descriptors: Option<Vec<Option<String>>>,
     /// Per-leaf certification verdicts, present when certification ran.
     pub certification: Option<Vec<LeafReport>>,
     /// The funding-gate decision, present exactly when certification ran.
@@ -177,6 +180,7 @@ pub fn compile(
         bound_externs: 0,
         facts: None,
         leaves: None,
+        descriptors: None,
         certification: None,
         gate: None,
         assembled: None,
@@ -375,6 +379,19 @@ fn instantiated(
                     }
                 }
             }
+            // The Miniscript descriptor for each leaf, derived from its spend's
+            // predicate (None when the spend is outside the expressible fragment).
+            let descriptors: Vec<Option<String>> = leaves
+                .iter()
+                .map(|l| {
+                    let spend = c.items.iter().find_map(|it| match it {
+                        crate::syntax::ast::Item::Spend(s) if s.name.text == l.name => Some(s),
+                        _ => None,
+                    })?;
+                    crate::codegen::descriptor::spend_descriptor(spend, &env)
+                })
+                .collect();
+            result.descriptors = Some(descriptors);
             result.leaves = Some(leaves);
         }
     }
@@ -595,10 +612,12 @@ pub fn result_to_json(result: &CompileResult, source: &str, args: Option<&str>) 
     }
 
     if let Some(leaves) = &result.leaves {
+        let descs = result.descriptors.as_deref();
         let ls: Vec<Json> = leaves
             .iter()
-            .map(|l| {
-                jobj(vec![
+            .enumerate()
+            .map(|(i, l)| {
+                let mut o = vec![
                     ("name", jstr(l.name.clone())),
                     ("bytes", Json::Int(l.script.len() as i128)),
                     ("hex", jstr(hex_of(&l.script))),
@@ -607,7 +626,11 @@ pub fn result_to_json(result: &CompileResult, source: &str, args: Option<&str>) 
                         "witnessOrder",
                         Json::Array(l.witness_order.iter().map(|w| jstr(w.clone())).collect()),
                     ),
-                ])
+                ];
+                if let Some(Some(d)) = descs.and_then(|ds| ds.get(i)) {
+                    o.push(("descriptor", jstr(d.clone())));
+                }
+                jobj(o)
             })
             .collect();
         top.push(("leaves".to_string(), Json::Array(ls)));

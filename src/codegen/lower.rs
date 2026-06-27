@@ -102,7 +102,7 @@ pub struct CseSubject {
 /// tail (leaf-result) item: the only such item today is an `after(...)` timelock
 /// (it lowers to `<n> CSV/CLTV DROP`). These run first so a value-producing
 /// conjunct can take the tail slot.
-fn is_verify_only_item(item: &Expr) -> bool {
+pub(crate) fn is_verify_only_item(item: &Expr) -> bool {
     matches!(
         item,
         Expr::Call { callee, args, .. }
@@ -138,7 +138,7 @@ fn check_sig_param(item: &Expr) -> Option<&str> {
 /// and everything else (hashlocks, thresholds) in between. A stable sort by this
 /// rank keeps source order within each group, so the layout is canonical
 /// (independent of how the conjuncts were written) and juggle-free.
-fn item_tail_rank(item: &Expr) -> u8 {
+pub(crate) fn item_tail_rank(item: &Expr) -> u8 {
     if is_verify_only_item(item) {
         0
     } else if check_sig_param(item).is_some() {

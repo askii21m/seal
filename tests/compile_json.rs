@@ -101,3 +101,48 @@ fn parse_error_json_is_not_ok_with_line_col() {
         "expected line/col on the diagnostic: {json}"
     );
 }
+
+#[test]
+fn leaf_descriptors_are_canonical_miniscript() {
+    // The per-leaf Miniscript descriptor Seal emits for each spend, derived from
+    // the predicate in canonical order. The differential harness gates the whole
+    // expressible fragment against rust-miniscript (parse the descriptor,
+    // re-encode, require it equals Seal's own leaf, 1000/1000); these goldens
+    // lock the corpus shapes in-repo so the emitter cannot drift.
+    let cases: &[(&str, &[&str])] = &[
+        (
+            "htlc",
+            &[
+                "and_v(v:sha256(abababababababababababababababababababababababababababababababab),pk(5cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc))",
+                "and_v(v:pk(2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c),after(900000))",
+            ],
+        ),
+        (
+            "vault",
+            &[
+                "and_v(v:pk(2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c),older(4320))",
+                "and_v(v:pk(f28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8),older(12960))",
+            ],
+        ),
+        (
+            "multisig",
+            &["multi_a(2,2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c,5cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc,f28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8)"],
+        ),
+    ];
+    for (name, want) in cases {
+        let src = read(&format!("{name}.sl"));
+        let args = read(&format!("{name}.args.json"));
+        let result = compile(&src, Some(&args), Target::Fund, CompileOptions::default());
+        let got: Vec<String> = result
+            .descriptors
+            .expect("descriptors present after lowering")
+            .into_iter()
+            .map(|d| d.expect("corpus leaf is Miniscript-expressible"))
+            .collect();
+        assert_eq!(
+            got.iter().map(String::as_str).collect::<Vec<_>>(),
+            *want,
+            "{name} leaf descriptors"
+        );
+    }
+}
