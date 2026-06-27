@@ -192,3 +192,27 @@ fn malleable_threshold_warns_pointing_at_eq() {
     assert!(!warns("== 2"), "`== 2` is non-malleable");
     assert!(!warns(">= 3"), "`>= 3` is n-of-n, non-malleable");
 }
+
+#[test]
+fn contract_tr_descriptor_is_the_full_taproot() {
+    // The full importable descriptor: tr(internal_key, {taptree}), with each leaf
+    // its Miniscript. rust-miniscript parsing this yields Seal's exact taproot
+    // output key (verified in the differential harness, corpus + generated); these
+    // goldens lock the corpus, including the NUMS (htlc/vault) and the MuSig2
+    // aggregate (multisig) internal keys.
+    let cases: &[(&str, &str)] = &[
+        ("htlc", "tr(1319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6ea,{and_v(v:sha256(abababababababababababababababababababababababababababababababab),pk(5cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc)),and_v(v:pk(2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c),after(900000))})"),
+        ("vault", "tr(1319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6ea,{and_v(v:pk(2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c),older(4320)),and_v(v:pk(f28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8),older(12960))})"),
+        ("multisig", "tr(e2bdbdbb8fcfc4476f4a5fd6388dd43d5ed311e9d7d794611d4969d2edd78efe,multi_a(2,2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c,5cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc,f28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8))"),
+    ];
+    for (name, want) in cases {
+        let src = read(&format!("{name}.sl"));
+        let args = read(&format!("{name}.args.json"));
+        let result = compile(&src, Some(&args), Target::Fund, CompileOptions::default());
+        let json = result_to_json(&result, &src, Some(&args));
+        assert!(
+            json.contains(&format!("\"descriptor\":\"{want}\"")),
+            "{name} contract descriptor missing or wrong"
+        );
+    }
+}

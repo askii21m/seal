@@ -496,6 +496,24 @@ fn tree_to_json(t: &crate::output::taproot::LeafTree, names: &[String], depths: 
     }
 }
 
+/// The taptree rendered as a Miniscript descriptor body: `{left,right}` branches
+/// with each leaf its Miniscript expression (`descs` aligned to leaf index). None
+/// if any leaf is outside the Miniscript-expressible fragment, so the whole
+/// `tr(..)` is omitted rather than emitted partial.
+fn tr_tree(
+    tree: &Option<crate::output::taproot::LeafTree>,
+    descs: &[Option<String>],
+) -> Option<String> {
+    use crate::output::taproot::LeafTree;
+    fn go(t: &LeafTree, descs: &[Option<String>]) -> Option<String> {
+        match t {
+            LeafTree::Leaf(i) => descs.get(*i).cloned().flatten(),
+            LeafTree::Branch(l, r) => Some(format!("{{{},{}}}", go(l, descs)?, go(r, descs)?)),
+        }
+    }
+    go(tree.as_ref()?, descs)
+}
+
 /// The full taproot output as data: the internal/output keys, the tweak, the
 /// merkle root, the NUMS disclosure, the tree topology, and per-leaf tapleaf
 /// hash + merkle path + control block. Everything an interactive taptree (or an
@@ -609,6 +627,16 @@ pub fn result_to_json(result: &CompileResult, source: &str, args: Option<&str>) 
         ));
         top.push(("lockfile".to_string(), jstr(asm.lockfile.clone())));
         top.push(("taproot".to_string(), taproot_to_json(&asm.output, result)));
+
+        // The full importable Miniscript descriptor: tr(internal_key, {taptree}),
+        // present only when every leaf is Miniscript-expressible. rust-miniscript
+        // parsing this yields the same taproot output key Seal funds.
+        if let Some(descs) = &result.descriptors
+            && let Some(body) = tr_tree(&asm.output.tree, descs)
+        {
+            let ik = hex_of(&asm.output.assembled.internal_key);
+            top.push(("descriptor".to_string(), jstr(format!("tr({ik},{body})"))));
+        }
     }
 
     if let Some(leaves) = &result.leaves {
