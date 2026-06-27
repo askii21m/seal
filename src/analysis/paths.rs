@@ -146,6 +146,9 @@ struct Facts {
     binding: bool,
     /// Threshold family (required, slots).
     threshold: Option<(i128, usize)>,
+    /// Span of a malleable `>= M` / `> M` signature threshold (one that leaves
+    /// room below the slot count), set so the non-malleability pass can warn.
+    malleable_threshold: Option<Span>,
     /// Instantiated timelocks: (is_height, value, span) / (is_blocks, value, span).
     abs_locks: Vec<(LockAbs, Span)>,
     rel_locks: Vec<(LockRel, Span)>,
@@ -285,6 +288,25 @@ impl<'a> Analyzer<'a> {
                 ty: ty_display(&p.ty),
                 class,
             });
+        }
+
+        // A `>= M` / `> M` signature threshold is malleable even though every
+        // signature slot is individually bound: the per-parameter classes above
+        // cannot see it because the freedom is in the COUNT, not any one slot.
+        if let Some(span) = facts.malleable_threshold {
+            self.diags.push(
+                Diagnostic::warning(
+                    "malleability/threshold",
+                    "a `>= M` (or `> M`) signature threshold is malleable: a satisfying \
+                     witness can carry more than M valid signatures, so a third party can \
+                     strip an excess one to a different valid witness with no key",
+                    span,
+                )
+                .with_help(
+                    "use `== M` for the non-malleable form (Miniscript's multi_a); it still \
+                     spends with any M of N -- M sign and the rest decline",
+                ),
+            );
         }
 
         // Obligations: the satisfier's transaction duties.
@@ -461,6 +483,15 @@ impl<'a> Analyzer<'a> {
                         facts.binding = true;
                     }
                     facts.threshold = Some((min_required, checks.len()));
+                    // `>= M` / `> M` with M below the slot count is malleable: more
+                    // than M slots can carry valid sigs, so a third party can strip
+                    // an excess one to empty and stay above the bound. (`== M`, and
+                    // `>= n` which forces all n, leave no excess.)
+                    if matches!(op, CmpOp::Ge | CmpOp::Gt)
+                        && min_required < checks.len() as i128
+                    {
+                        facts.malleable_threshold = Some(item.span());
+                    }
                 }
             }
             _ => {}

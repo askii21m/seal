@@ -170,3 +170,25 @@ fn malleable_threshold_emits_no_descriptor() {
         );
     }
 }
+
+#[test]
+fn malleable_threshold_warns_pointing_at_eq() {
+    // `>= M` / `> M` key thresholds with M below the slot count are malleable;
+    // the gate warns (and points at `== M`) rather than silently implying
+    // non-malleability. `== M`, and `>= n` (n-of-n, no excess), do not warn.
+    let keys = r#"{"keys":["0x2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c","0x5cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc","0xf28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8"]}"#;
+    let warns = |op: &str| {
+        let src = format!(
+            "contract M {{ extern const keys: [PublicKey; 3];
+                spend f(sigs: [Signature; 3]) {{
+                    require sum(k in keys, s in sigs => k.check(s)) {op};
+                }} keypath None; }}"
+        );
+        let result = compile(&src, Some(keys), Target::Fund, CompileOptions::default());
+        result_to_json(&result, &src, Some(keys)).contains("malleability/threshold")
+    };
+    assert!(warns(">= 2"), "`>= 2` of 3 is malleable");
+    assert!(warns("> 1"), "`> 1` of 3 is malleable");
+    assert!(!warns("== 2"), "`== 2` is non-malleable");
+    assert!(!warns(">= 3"), "`>= 3` is n-of-n, non-malleable");
+}
