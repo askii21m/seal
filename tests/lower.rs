@@ -137,16 +137,16 @@ fn hashlock_golden() {
         vec![
             // reverse-consumption layout: p (consumed first) is on top, s
             // (consumed last by CHECKSIG) is deepest.
-            // airlock: p is Bytes<32>, SIZE check IN PLACE (p is on top, SIZE
-            // is non-consuming), never elided -- no PICK-copy, no DROP.
-            // EQUALVERIFY (SIZE and a minimal push share an encoding; matches
-            // rust-miniscript and the certifier decodes it as a length check).
+            // sha256(p) == h, with p's length airlock INTERLEAVED: pick p, then
+            // check its size IN PLACE (SIZE is non-consuming, EQUALVERIFY -- SIZE
+            // and a minimal push share an encoding, matches rust-miniscript and
+            // the certifier decodes it as a length check), then hash. The airlock
+            // sits right before the hash, not juggled up front.
+            Op::PushNum(0),
+            Op::Pick,
             Op::Size,
             Op::PushNum(32),
             Op::EqualVerify,
-            // sha256(p) == h: byte equality fuses to EQUALVERIFY
-            Op::PushNum(0),
-            Op::Pick,
             Op::Sha256,
             Op::Push(key_bytes(0x22)),
             Op::EqualVerify,

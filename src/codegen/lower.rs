@@ -148,22 +148,34 @@ fn item_tail_rank(item: &Expr) -> u8 {
     }
 }
 
-/// The order in which signature parameters are first consumed by a single-sig
-/// `key.check(sig)` in the body, using the SAME emission order as the body loop
-/// (per require block: items sorted by `item_tail_rank`). Laying the signature
-/// witness slots out in reverse of this order puts the first-consumed sig on top,
-/// so each `CHECKSIG(VERIFY)` eats off the stack top with no SWAP/ROLL.
-fn sig_consumption_order(body: &[Stmt]) -> Vec<String> {
-    let mut order = Vec::new();
-    for stmt in body {
-        if let Stmt::Require(req) = stmt {
-            let mut items: Vec<&Expr> = req.items.iter().collect();
-            items.sort_by_key(|it| item_tail_rank(it));
-            for item in items {
-                if let Some(s) = check_sig_param(item)
-                    && !order.iter().any(|n| n == s)
-                {
-                    order.push(s.to_string());
+/// The order in which WITNESS parameters are first consumed by the body, using
+/// the SAME emission order as the body loop (items sorted by `item_tail_rank`).
+/// Laying the witness slots out in reverse of this order puts the first-consumed
+/// param on top, so each consuming op (CHECKSIG, the hash after an interleaved
+/// airlock, ...) eats off the stack top with no SWAP/ROLL/PICK -- including two
+/// preimages, whose airlock+hash now run back-to-back with no leading SWAP.
+fn param_consumption_order(s: &Spend) -> Vec<String> {
+    let params: BTreeSet<&str> = s.params.iter().map(|p| p.name.text.as_str()).collect();
+    let mut order: Vec<String> = Vec::new();
+    let record = |e: &Expr, order: &mut Vec<String>| {
+        walk_guard_uses(e, &mut |name, _| {
+            if params.contains(name) && !order.iter().any(|n| n == name) {
+                order.push(name.to_string());
+            }
+        });
+    };
+    // Body emission order: a `let` is lowered where it appears (its value is
+    // consumed then -- e.g. cat_bounty's `drawing` array, used only inside a
+    // `let score = .. sum(px in drawing ..)`), then each require's items in
+    // tail-rank order. A param missing here is genuinely unconsumed.
+    for stmt in &s.body {
+        match stmt {
+            Stmt::Let { value, .. } => record(value, &mut order),
+            Stmt::Require(req) => {
+                let mut items: Vec<&Expr> = req.items.iter().collect();
+                items.sort_by_key(|it| item_tail_rank(it));
+                for item in items {
+                    record(item, &mut order);
                 }
             }
         }
@@ -201,6 +213,7 @@ pub fn lower(
                 tail_result: false,
                 diags: Vec::new(),
                 dead_slots: BTreeSet::new(),
+                pending_airlock: BTreeMap::new(),
             };
             if let Some(leaf) = lw.spend(s) {
                 let bytes = script::serialize(&leaf.0);
@@ -293,6 +306,13 @@ struct Lowerer<'a> {
     /// Witness array-element slots proven dead: omitted from the layout AND the
     /// comprehension fold (their value cannot affect the spend).
     dead_slots: BTreeSet<String>,
+    /// Scalar `Bytes`/`Hash` witness slots whose length airlock has not yet been
+    /// emitted. Their airlock is INTERLEAVED -- emitted in place the first time
+    /// the body brings the value to the top to consume it -- so two preimages no
+    /// longer force a PICK/SWAP/DROP up front (matching rust-miniscript's leaf).
+    /// A live scalar `Bytes`/`Hash` slot is always consumed (dead ones are
+    /// eliminated), so every entry is drained by the body. Maps slot -> length.
+    pending_airlock: BTreeMap<String, i64>,
 }
 
 impl<'a> Lowerer<'a> {
@@ -463,27 +483,24 @@ impl<'a> Lowerer<'a> {
             .unwrap_or_default();
         let mut consume_emitted = false;
         let pairs: Vec<_> = if covered.is_empty() {
-            let (mut sigs, rest): (Vec<_>, Vec<_>) = params
-                .iter()
-                .zip(&s.params)
-                .partition(|(p, _)| matches!(p.ty, Ty::Signature));
-            // Reverse-consumption order WITHIN the signature group: the sig a
-            // check consumes LAST goes deepest, the first-consumed goes on top,
-            // so each CHECKSIG(VERIFY) eats off the stack top with no SWAP/ROLL.
-            // (The sigs-deepest partition above already orders sigs vs other
-            // params; this finishes the same reverse-consumption rule among the
-            // sigs themselves -- e.g. two independent `.check()`s no longer emit
-            // a SWAP and stop depending on declaration order.) A stable sort
-            // keeps declaration order for any sig not consumed by a plain check.
-            let consume_order = sig_consumption_order(&s.body);
+            // Reverse-consumption layout over ALL witness params: the param a
+            // check/hash consumes FIRST goes on top, the last-consumed deepest, so
+            // every consuming op eats off the stack top with no SWAP/ROLL/PICK.
+            // Signatures still sit deepest because sig checks are emitted last
+            // (item_tail_rank); two preimages now lay out in consumption order so
+            // their interleaved airlock+hash run back-to-back with no leading
+            // SWAP. Unconsumed params sit deepest; a stable sort keeps declaration
+            // order among ties (so the result is canonical).
+            let consume_order = param_consumption_order(s);
             let rank = |name: &str| consume_order.iter().position(|c| c == name);
-            sigs.sort_by(|(a, _), (b, _)| match (rank(&a.name), rank(&b.name)) {
+            let mut all: Vec<_> = params.iter().zip(&s.params).collect();
+            all.sort_by(|(a, _), (b, _)| match (rank(&a.name), rank(&b.name)) {
                 (Some(ia), Some(ib)) => ib.cmp(&ia), // later-consumed deeper
                 (Some(_), None) => std::cmp::Ordering::Greater, // unconsumed deepest
                 (None, Some(_)) => std::cmp::Ordering::Less,
                 (None, None) => std::cmp::Ordering::Equal, // keep declaration order
             });
-            sigs.into_iter().chain(rest).collect()
+            all
         } else {
             params.iter().zip(&s.params).collect()
         };
@@ -538,7 +555,15 @@ impl<'a> Lowerer<'a> {
         for (p, ast_p) in params.iter().zip(&s.params) {
             let span = ast_p.name.span;
             match &p.ty {
-                Ty::Bytes(_) | Ty::Hash(_) | Ty::PublicKey => {
+                // Scalar Bytes/Hash: defer to an INTERLEAVED airlock emitted in
+                // place at first consumption (see `airlock_pending`), so multiple
+                // preimages don't force a PICK/SWAP/DROP up front. PublicKey stays
+                // a batch airlock (keys are pushed via push_key, not push_value).
+                Ty::Bytes(_) | Ty::Hash(_) => {
+                    let n = self.byte_len(&p.ty, span).ok()?;
+                    self.pending_airlock.insert(p.name.clone(), n);
+                }
+                Ty::PublicKey => {
                     let n = self.byte_len(&p.ty, span).ok()?;
                     self.airlock_size(&p.name, n, span).ok()?;
                 }
@@ -620,6 +645,24 @@ impl<'a> Lowerer<'a> {
                         }
                     }
                 }
+            }
+        }
+
+        // Safety net: a deferred Bytes/Hash airlock the body never consumed (a
+        // rare dead-but-not-eliminated scalar) still needs its length check to
+        // match the typed predicate, or the leaf would under-constrain the
+        // witness. Emit the copy-form airlock for any leftover before CLEANSTACK.
+        if !self.pending_airlock.is_empty() {
+            let leftover: Vec<(String, i64)> =
+                self.pending_airlock.iter().map(|(k, v)| (k.clone(), *v)).collect();
+            for (slot, n) in leftover {
+                self.pending_airlock.remove(&slot);
+                let span = s
+                    .params
+                    .iter()
+                    .find(|p| p.name.text == slot)
+                    .map_or(s.name.span, |p| p.name.span);
+                self.airlock_size(&slot, n, span).ok()?;
             }
         }
 
@@ -710,6 +753,20 @@ impl<'a> Lowerer<'a> {
             self.emit_pop(Op::Drop, 1); // discard the PICK copy
         }
         Ok(())
+    }
+
+    /// Interleaved length airlock: the first time a deferred scalar Bytes/Hash
+    /// witness slot reaches the stack top (just brought up to be consumed), check
+    /// its length IN PLACE -- `SIZE <n> EQUALVERIFY` -- then forget it. `OP_SIZE`
+    /// is non-consuming, so the value stays on top for its consuming use (the
+    /// hash/compare). No-op for a slot already airlocked or never deferred. This
+    /// is what removes the up-front PICK/SWAP/DROP for a second preimage.
+    fn airlock_pending(&mut self, name: &str) {
+        if let Some(n) = self.pending_airlock.remove(name) {
+            self.emit_op(Op::Size, 0); // push len, value stays: model +1
+            self.emit_push(Op::PushNum(n));
+            self.emit_pop(Op::EqualVerify, 2);
+        }
     }
 
     /// Bool canonicality ({} or 0x01) for params used outside IF-position
@@ -1367,7 +1424,14 @@ impl<'a> Lowerer<'a> {
             return self.push_const(&v, e.span());
         }
         match e {
-            Expr::Name(n) => self.pick(&n.text, n.span),
+            Expr::Name(n) => {
+                self.pick(&n.text, n.span)?;
+                // First time this preimage reaches the top, airlock its length
+                // in place (deferred from the batch phase) so its size-check sits
+                // right before the hash, not juggled up front.
+                self.airlock_pending(&n.text);
+                Ok(())
+            }
             Expr::Unary { op, operand, .. } => {
                 self.push_value(operand)?;
                 match op {
