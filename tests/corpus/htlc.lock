@@ -10,12 +10,12 @@
     "timelock": "height 900000",
     "hashlock": "0xabababababababababababababababababababababababababababababababab"
   },
-  "address": "bc1pn03v6pjm54ex8ayvj2u68rp332xtm4qy845e38qkmmj6fal484rsyklkdk",
-  "output_key": "9be2cd065ba57263f48c92b9a38c318a8cbdd4043d69989c16dee5a4f7f53d47",
-  "parity": 1,
+  "address": "bc1ptvl6rpv7kefnvta9jeyzt8s384fzrk8una3f5n7dxhxxqletm6wqtfsarq",
+  "output_key": "5b3fa1859eb653362fa59648259e113d5221d8fc9f629a4fcd35cc607f2bde9c",
+  "parity": 0,
   "internal_key": "1319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6ea",
-  "merkle_root": "d4851c2aed2eb02ac542b77757f719bff10286c8b05705b6dd2e354d76e32dd1",
-  "tweak": "bed0a9ae31fa6182969fd59b179381892627a14b3401ea5575470996b7800d41",
+  "merkle_root": "748fc0ac87902e5f7b2c56e434d2f0498b87fc6cc987601b3d947dd65e1ab4d7",
+  "tweak": "8fec775121103f940b5a38d6c01eaba65f2ef3bd085f79105981850acadbca22",
   "tree": "branch(swap, refund)",
   "leaves": [
     {
@@ -23,7 +23,7 @@
       "script": "8201209da820abababababababababababababababababababababababababababababababab88205cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
       "leaf_hash": "cf687ca9f38f25a72e530c1c54e3e6d8357a79cb244441ff5ae1e24678931e57",
       "depth": 1,
-      "control_block": "c11319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6ea6e7d31830c4600507547ba346af1324f7d6910f11da5293725025aad2314fe83",
+      "control_block": "c01319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6ea90d1e3e4b0b7f48db9b4cbb807c0ba8631e83d614390fb61e1c3a716244aae80",
       "witness": [
         "signature",
         "preimage"
@@ -34,14 +34,14 @@
     },
     {
       "name": "refund",
-      "script": "03a0bb0db175202b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6cac",
-      "leaf_hash": "6e7d31830c4600507547ba346af1324f7d6910f11da5293725025aad2314fe83",
+      "script": "202b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6cad03a0bb0db1",
+      "leaf_hash": "90d1e3e4b0b7f48db9b4cbb807c0ba8631e83d614390fb61e1c3a716244aae80",
       "depth": 1,
-      "control_block": "c11319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6eacf687ca9f38f25a72e530c1c54e3e6d8357a79cb244441ff5ae1e24678931e57",
+      "control_block": "c01319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6eacf687ca9f38f25a72e530c1c54e3e6d8357a79cb244441ff5ae1e24678931e57",
       "witness": [
         "signature"
       ],
-      "script_bytes": 40,
+      "script_bytes": 39,
       "control_bytes": 65,
       "witness_elements": 1
     }

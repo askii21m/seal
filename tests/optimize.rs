@@ -98,7 +98,11 @@ fn vault_bare_checks_shrink_and_agree() {
     for (name, age) in [("fallback", 4320u32), ("recover", 12960)] {
         let l = leaf(&leaves, name);
         assert_eq!(l.script.len(), 43, "naive {name}");
-        assert_eq!(opt_len(l), 39, "optimized {name} (consume + tail-result)");
+        assert_eq!(
+            opt_len(l),
+            38,
+            "optimized {name} (consume + trailing-timelock tail, no DROP)"
+        );
         agree(
             &info,
             &env,
@@ -135,7 +139,7 @@ fn htlc_leaves_shrink_and_agree() {
 
     let refund = leaf(&leaves, "refund");
     assert_eq!(refund.script.len(), 44);
-    assert_eq!(opt_len(refund), 40);
+    assert_eq!(opt_len(refund), 39); // trailing-timelock tail drops the OP_DROP
     agree(
         &info,
         &env,

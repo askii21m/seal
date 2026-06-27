@@ -9,37 +9,37 @@
     "cosigner": "0x5cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
     "cold": "0xf28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8"
   },
-  "address": "bc1pwxhf7hg36zvcf6u5fyzrrvqthv8rqhl0h23nk0ukunyc4yuvfk0s50rr0q",
-  "output_key": "71ae9f5d11d09984eb94490431b00bbb0e305fefbaa33b3f96e4c98a938c4d9f",
-  "parity": 1,
+  "address": "bc1pwsjqke4jpz06hx32anypxdfauwpc322fh28vtnnj6fzfg79m3t9sqe2dnl",
+  "output_key": "74240b66b2089fab9a2aecc813353de38388a949ba8ec5ce72d2449478bb8acb",
+  "parity": 0,
   "internal_key": "1319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6ea",
-  "merkle_root": "bda0b21bcaf6ffcdde876faaf8c5d16e17d7247194684a980c5c821a1756da15",
-  "tweak": "6775407fccf4320aff592bc6a57b7fd51b2af09622aa396eca1c38d43e90f968",
+  "merkle_root": "243f50c7410a4b60c537a3d3dc4dac6c811aab324e3950629220ad64292e6e77",
+  "tweak": "93bcd1983e150881bed91dc82d857ea67469f3d2ca727ed64d251835e67007f4",
   "tree": "branch(fallback, recover)",
   "leaves": [
     {
       "name": "fallback",
-      "script": "02e010b275202b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6cac",
-      "leaf_hash": "caa0dd774f97c3665e11986522f71302ad480259dc9add0b96bf529064ae9d68",
+      "script": "202b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6cad02e010b2",
+      "leaf_hash": "c389ffcfb5374d54b649a522d9989addbf29ce99250ed9959a0a1e43469747c4",
       "depth": 1,
-      "control_block": "c11319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6ea8845d6892fe23fd2ea4972360e4cb568f2abc8f821281b0c0eba87461414185e",
+      "control_block": "c01319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6ead419cb58eebf05278ab32b80ffafe761cacba38c5cc93abea6083419506ddf38",
       "witness": [
         "signature"
       ],
-      "script_bytes": 39,
+      "script_bytes": 38,
       "control_bytes": 65,
       "witness_elements": 1
     },
     {
       "name": "recover",
-      "script": "02a032b27520f28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8ac",
-      "leaf_hash": "8845d6892fe23fd2ea4972360e4cb568f2abc8f821281b0c0eba87461414185e",
+      "script": "20f28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8ad02a032b2",
+      "leaf_hash": "d419cb58eebf05278ab32b80ffafe761cacba38c5cc93abea6083419506ddf38",
       "depth": 1,
-      "control_block": "c11319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6eacaa0dd774f97c3665e11986522f71302ad480259dc9add0b96bf529064ae9d68",
+      "control_block": "c01319173b03c7cea0bdb834bc39f53d668d4add15531e18b86532d9e4ef83b6eac389ffcfb5374d54b649a522d9989addbf29ce99250ed9959a0a1e43469747c4",
       "witness": [
         "signature"
       ],
-      "script_bytes": 39,
+      "script_bytes": 38,
       "control_bytes": 65,
       "witness_elements": 1
     }

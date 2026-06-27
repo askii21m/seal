@@ -36,7 +36,11 @@ pub fn optimize(leaf: &LoweredLeaf) -> LoweredLeaf {
     // Finally, two arithmetic peepholes: fuse a CSE'd two-sided range into a
     // single WITHIN, and fold a constant addend across a comparison.
     let fused = fuse_within(&scheduled).unwrap_or(scheduled);
-    fold_const_add_cmp(&fused).unwrap_or(fused)
+    let folded = fold_const_add_cmp(&fused).unwrap_or(fused);
+    // Finally, hoist a single trailing-eligible timelock to the tail: CSV/CLTV's
+    // own (always-positive) operand becomes the leaf result, so the up-front
+    // OP_DROP vanishes (matching rust-miniscript's trailing-timelock form).
+    hoist_timelock_to_tail(&folded).unwrap_or(folded)
 }
 
 /// Fold a constant addend across a comparison: `<c> ADD <k> CMP` -> `<k-c> CMP`,
@@ -674,4 +678,98 @@ fn rebuild(
     }
     // The leaf must end clean: exactly one result on the stack.
     if model.len() == 1 { Some(out) } else { None }
+}
+
+/// Hoist a single trailing-eligible timelock to the tail. Lowering emits an
+/// `after` as `<t> CSV/CLTV DROP` (verify-only, leaves nothing) ahead of the
+/// body, so a timelocked spend ends in its sig/hash result with the timelock
+/// dropped up front: `<t> CSV DROP .. <result>`. rust-miniscript instead places
+/// one timelock LAST, where CSV/CLTV's own (always-positive) operand IS the leaf
+/// result -- no DROP. This peephole performs that move on the optimized leaf:
+/// remove one `<t> CSV/CLTV DROP` triple, turn the final result op into its
+/// VERIFY form, and append `<t> CSV/CLTV`. Net: -1 byte, and byte-identical to
+/// Miniscript for a single timelock. Conservative: flat (branch-free) leaves
+/// only, only when a convertible boolean result trails, re-simulated and
+/// re-serialized (and never kept unless it shrinks) before returning.
+fn hoist_timelock_to_tail(leaf: &LoweredLeaf) -> Option<LoweredLeaf> {
+    let ops = &leaf.ops;
+    // A timelock inside a branch must not be hoisted past the branch boundary.
+    if ops
+        .iter()
+        .any(|o| matches!(o, Op::If | Op::NotIf | Op::Else | Op::EndIf))
+    {
+        return None;
+    }
+    // The last `<t> (CSV|CLTV) DROP` triple. It leaves nothing, so its position
+    // is immaterial to the rest of the leaf; a single timelock has exactly one.
+    let mut found: Option<(usize, i64, Op)> = None;
+    for i in 0..ops.len().saturating_sub(2) {
+        if let (Op::PushNum(t), lock @ (Op::Csv | Op::Cltv), Op::Drop) =
+            (&ops[i], &ops[i + 1], &ops[i + 2])
+        {
+            found = Some((i, *t, lock.clone()));
+        }
+    }
+    let (start, t, lock) = found?;
+    let last = ops.len() - 1;
+    if last <= start + 2 {
+        return None; // nothing trails the triple to become the new result
+    }
+    let verify_form = result_to_verify(&ops[last])?;
+
+    let mut new_ops: Vec<Op> = Vec::with_capacity(ops.len() + 1);
+    for (j, op) in ops.iter().enumerate() {
+        if (start..=start + 2).contains(&j) {
+            continue; // drop the `<t> CSV/CLTV DROP` triple
+        }
+        if j == last {
+            new_ops.extend(verify_form.iter().cloned());
+        } else {
+            new_ops.push(op.clone());
+        }
+    }
+    new_ops.push(Op::PushNum(t));
+    new_ops.push(lock);
+
+    // Independent re-check (mirrors try_optimize): the rewritten leaf must
+    // simulate to a single result, serialize, validate, and actually shrink.
+    match simulate(&new_ops, leaf.witness_order.len()) {
+        Some((_, 1)) => {}
+        _ => return None,
+    }
+    let script = script::serialize(&new_ops);
+    script::verify_script(&script).ok()?;
+    if script.len() >= leaf.script.len() {
+        return None;
+    }
+    Some(LoweredLeaf {
+        name: leaf.name.clone(),
+        ops: new_ops,
+        script,
+        witness_order: leaf.witness_order.clone(),
+        removable: Vec::new(),
+        cse_subjects: Vec::new(),
+    })
+}
+
+/// The VERIFY form of a boolean leaf-result op (the inverse of `tail_result`):
+/// the timelock's `<t>` now supplies the leaf result, so the prior result must
+/// be asserted instead of left on the stack. Ops with a fused verify counterpart
+/// use it (1 byte); the rest get an explicit VERIFY appended. Returns None for
+/// anything that is not a boolean result we can safely verify (keeps the leaf).
+fn result_to_verify(op: &Op) -> Option<Vec<Op>> {
+    Some(match op {
+        Op::CheckSig => vec![Op::CheckSigVerify],
+        Op::Equal => vec![Op::EqualVerify],
+        Op::NumEqual => vec![Op::NumEqualVerify],
+        Op::GreaterThan
+        | Op::GreaterThanOrEqual
+        | Op::LessThan
+        | Op::LessThanOrEqual
+        | Op::NumNotEqual
+        | Op::Within
+        | Op::BoolAnd
+        | Op::BoolOr => vec![op.clone(), Op::Verify],
+        _ => return None,
+    })
 }
