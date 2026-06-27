@@ -146,3 +146,27 @@ fn leaf_descriptors_are_canonical_miniscript() {
         );
     }
 }
+
+#[test]
+fn malleable_threshold_emits_no_descriptor() {
+    // `>= M` / `> M` key thresholds are malleable: a third party can strip an
+    // excess signature, dropping the count but keeping it above the bound, for a
+    // different valid witness. Miniscript's multi_a is exactly-M for that reason,
+    // so a `>= M` leaf is NOT a descriptor. The emitter must refuse to name one
+    // rather than emit a multi_a that points at a different address than Seal funds.
+    let keys = r#"{"keys":["0x2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c","0x5cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc","0xf28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8"]}"#;
+    for op in [">=", ">"] {
+        let src = format!(
+            "contract M {{ extern const keys: [PublicKey; 3];
+                spend f(sigs: [Signature; 3]) {{
+                    require sum(k in keys, s in sigs => k.check(s)) {op} 2;
+                }} keypath None; }}"
+        );
+        let result = compile(&src, Some(keys), Target::Fund, CompileOptions::default());
+        assert_eq!(
+            result.descriptors.expect("lowered"),
+            vec![None],
+            "`{op} M` must emit no descriptor"
+        );
+    }
+}

@@ -788,7 +788,7 @@ fn corpus_lowers_clean_and_passes_the_poison_gate() {
         (1, 2)
     );
     assert!(!f.ops.contains(&Op::Pick) && !f.ops.contains(&Op::Swap));
-    assert!(f.ops.ends_with(&[Op::PushNum(2), Op::GreaterThanOrEqual]));
+    assert!(f.ops.ends_with(&[Op::PushNum(2), Op::NumEqual])); // == M: exactly-M, non-malleable
     assert_eq!(f.script.len(), 3 * 34 + 2, "the spec's 34n + ~2 contract");
 
     let cat = load("cat_bounty");

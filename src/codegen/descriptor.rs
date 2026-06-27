@@ -140,7 +140,12 @@ fn threshold_fragment(item: &Expr, env: &Env) -> Option<String> {
     let [(op, rhs)] = rest.as_slice() else {
         return None;
     };
-    if !matches!(op, CmpOp::Eq | CmpOp::Ge) {
+    // ONLY `== M`. Miniscript's multi_a is exactly-M (`OP_NUMEQUAL`); it has no
+    // `>= M` / `> M` form because those are malleable (a third party can strip an
+    // excess signature, dropping the count but keeping it above the bound). A
+    // `>= M` leaf is NOT a Miniscript descriptor, so emitting one would name a
+    // different address than Seal funds.
+    if *op != CmpOp::Eq {
         return None;
     }
     let Expr::Comprehension {
