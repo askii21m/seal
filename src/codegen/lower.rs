@@ -131,19 +131,35 @@ fn check_sig_param(item: &Expr) -> Option<&str> {
     }
 }
 
+/// Body emission rank within a `require` conjunction: timelocks first (they are
+/// verify-only and leave nothing), signature checks LAST (a signature is the
+/// natural tail result, and -- consumed last -- it sits deepest in the witness,
+/// so the preimages stacked above it airlock and hash IN PLACE with no SWAP/ROLL),
+/// and everything else (hashlocks, thresholds) in between. A stable sort by this
+/// rank keeps source order within each group, so the layout is canonical
+/// (independent of how the conjuncts were written) and juggle-free.
+fn item_tail_rank(item: &Expr) -> u8 {
+    if is_verify_only_item(item) {
+        0
+    } else if check_sig_param(item).is_some() {
+        2
+    } else {
+        1
+    }
+}
+
 /// The order in which signature parameters are first consumed by a single-sig
-/// `key.check(sig)` in the body, using the SAME emission order as the body
-/// loop (per require block: verify-only items first, then value-producers;
-/// blocks in source order). Laying the signature witness slots out in reverse
-/// of this order puts the first-consumed sig on top, so each
-/// `CHECKSIG(VERIFY)` eats off the stack top with no SWAP/ROLL.
+/// `key.check(sig)` in the body, using the SAME emission order as the body loop
+/// (per require block: items sorted by `item_tail_rank`). Laying the signature
+/// witness slots out in reverse of this order puts the first-consumed sig on top,
+/// so each `CHECKSIG(VERIFY)` eats off the stack top with no SWAP/ROLL.
 fn sig_consumption_order(body: &[Stmt]) -> Vec<String> {
     let mut order = Vec::new();
     for stmt in body {
         if let Stmt::Require(req) = stmt {
-            let (verify_only, value_items): (Vec<&Expr>, Vec<&Expr>) =
-                req.items.iter().partition(|it| is_verify_only_item(it));
-            for item in verify_only.into_iter().chain(value_items) {
+            let mut items: Vec<&Expr> = req.items.iter().collect();
+            items.sort_by_key(|it| item_tail_rank(it));
+            for item in items {
                 if let Some(s) = check_sig_param(item)
                     && !order.iter().any(|n| n == s)
                 {
@@ -576,11 +592,14 @@ impl<'a> Lowerer<'a> {
                     self.lets_bytes.insert(name.text.clone(), is_bytes);
                 }
                 Stmt::Require(req) => {
-                    // Stable partition: verify-only items first, value-producers
-                    // after, each keeping source order within its group.
-                    let (verify_only, value_items): (Vec<&Expr>, Vec<&Expr>) =
-                        req.items.iter().partition(|it| is_verify_only_item(it));
-                    let ordered: Vec<&Expr> = verify_only.into_iter().chain(value_items).collect();
+                    // Emission order by tail-rank (see `item_tail_rank`):
+                    // timelocks first, then hashlocks / other value-producers,
+                    // then signature checks last so a signature is the tail and
+                    // the preimages above it airlock in place -- no juggle. A
+                    // stable sort keeps source order within each rank, so the
+                    // leaf is canonical (independent of conjunct source order).
+                    let mut ordered: Vec<&Expr> = req.items.iter().collect();
+                    ordered.sort_by_key(|it| item_tail_rank(it));
                     // Only the last item of the body's last require can be tail.
                     let tail: Option<&Expr> = if last_is_require && si + 1 == stmt_count {
                         ordered.last().copied()
