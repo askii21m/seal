@@ -972,6 +972,32 @@ impl<'a> Lowerer<'a> {
             _ => return Ok(None),
         };
         self.consume_done = true;
+        let n = chain.len();
+        // n-of-n (`== n`, or `>= n` which is equivalent since the count cannot
+        // exceed n) is a pure conjunction: every signature must verify. Emit the
+        // AND-chain `<k0> CHECKSIGVERIFY .. <k_{n-1}> CHECKSIG` -- the same form a
+        // hand-written `k0.check(s0) && .. && kn.check(sn)` lowers to, and the
+        // form rust-miniscript collapses n-of-n to -- instead of the CHECKSIGADD
+        // tally plus `<n> NUMEQUAL`. Both consume the same sig slots off the top
+        // in chain order; the AND-chain just drops the dead count (-2 bytes).
+        let n_of_n = matches!(op, CmpOp::Eq | CmpOp::Ge)
+            && matches!(self.eval(bound), Some(ConstValue::Int(b)) if b == n as i128);
+        if n_of_n {
+            for (i, (key, _)) in chain.iter().enumerate() {
+                self.emit_push(Op::Push(key.clone()));
+                if i + 1 < n {
+                    self.emit_pop(Op::CheckSigVerify, 2); // consumes (pk, sig)
+                } else {
+                    self.emit_op(Op::CheckSig, 2); // last: leaves the bool result
+                }
+            }
+            if is_tail && self.stack.len() == 1 {
+                self.tail_result = true; // the final CHECKSIG is the leaf result
+            } else {
+                self.emit_pop(Op::Verify, 1);
+            }
+            return Ok(Some(()));
+        }
         for (i, (key, _)) in chain.iter().enumerate() {
             self.emit_push(Op::Push(key.clone()));
             if i == 0 {

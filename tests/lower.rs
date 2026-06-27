@@ -240,15 +240,17 @@ fn two_independent_sig_checks_no_juggle_and_order_independent() {
     );
 }
 
-// --- thresholds: the guaranteed CHECKSIGADD chain ---
+// --- thresholds: the CHECKSIGADD counting chain (k < n) ---
 //
 // A cost contract: keys lexicographic, signatures consumed off the stack
 // top (witness slots in reverse chain order, named in the template), zero
 // stack manipulation, and in tail position the comparison is the leaf
-// result: `34n + ~2` script bytes.
+// result: `34n + ~2` script bytes. n-of-n (k == n) is a pure conjunction, so
+// it collapses to the AND-chain `<k0> CHECKSIGVERIFY .. <kn-1> CHECKSIG`
+// (34n bytes, no `<n> NUMEQUAL/GTE` tail) -- matching rust-miniscript.
 
 #[test]
-fn explicit_two_of_two_chain() {
+fn explicit_two_of_two_collapses_to_and_chain() {
     let leaf = one_leaf(
         "contract T {
             extern const a: PublicKey;
@@ -260,15 +262,15 @@ fn explicit_two_of_two_chain() {
         }",
         &format!(r#"{{"a": {KEY_A}, "b": {KEY_B}}}"#),
     );
+    // 2-of-2 is n-of-n: every signature must verify, so this is the AND-chain,
+    // not the CHECKSIGADD tally plus `<2> GREATERTHANOREQUAL`.
     assert_eq!(
         leaf.ops,
         vec![
             Op::Push(key_bytes(0x11)),
-            Op::CheckSig,
+            Op::CheckSigVerify,
             Op::Push(key_bytes(0x22)),
-            Op::CheckSigAdd,
-            Op::PushNum(2),
-            Op::GreaterThanOrEqual,
+            Op::CheckSig,
         ],
         "asm: {}",
         asm(&leaf.ops)
@@ -276,11 +278,7 @@ fn explicit_two_of_two_chain() {
     // Consumption order mirrors the chain: sa (key 0x11) goes on top, so it
     // is listed last (first = deepest).
     assert_eq!(leaf.witness_order, vec!["sb", "sa"]);
-    assert_eq!(
-        leaf.script.len(),
-        2 * 34 + 2,
-        "the spec's 34n + ~2 contract"
-    );
+    assert_eq!(leaf.script.len(), 2 * 34, "n-of-n AND-chain: 34n bytes");
 }
 
 #[test]
