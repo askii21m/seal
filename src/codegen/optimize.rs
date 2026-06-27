@@ -720,10 +720,18 @@ fn hoist_timelock_to_tail(leaf: &LoweredLeaf) -> Option<LoweredLeaf> {
     let mut new_ops: Vec<Op> = Vec::with_capacity(ops.len() + 1);
     for (j, op) in ops.iter().enumerate() {
         if (start..=start + 2).contains(&j) {
-            continue; // drop the `<t> CSV/CLTV DROP` triple
+            continue; // drop the `<t> CSV/CLTV DROP` triple we hoist to the tail
         }
         if j == last {
             new_ops.extend(verify_form.iter().cloned());
+        } else if matches!(op, Op::Drop) && j >= 1 && matches!(ops[j - 1], Op::Csv | Op::Cltv) {
+            // Any OTHER timelock (a second one we do not hoist): emit the
+            // canonical `<t> CSV/CLTV VERIFY` (Miniscript's v:older / v:after)
+            // rather than `<t> CSV/CLTV DROP`. Same byte length and semantically
+            // identical -- CSV/CLTV leaves a positive value, VERIFY asserts it
+            // (always true), DROP discards it -- but VERIFY is a parseable
+            // Miniscript fragment, so the leaf stays a valid descriptor.
+            new_ops.push(Op::Verify);
         } else {
             new_ops.push(op.clone());
         }
