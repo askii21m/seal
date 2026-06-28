@@ -854,6 +854,14 @@ impl<'a> Engine<'a> {
                         lo: count_iv.lo.saturating_add(contrib.lo),
                         hi: count_iv.hi.saturating_add(contrib.hi),
                     };
+                    // Every partial count is an on-chain ADD result too. Bound it
+                    // locally like sum/fold instead of leaning on the distant
+                    // MAX_WITNESS_ELEMENTS limit to keep it inside the 4-byte
+                    // CScriptNum domain (defense in depth: today the limit makes
+                    // this unreachable, but the bound should not depend on it).
+                    if body_runtime {
+                        self.result_fits(count_iv, span, &[])?;
+                    }
                 }
                 "all" | "any" => {}
                 "fold" => {
