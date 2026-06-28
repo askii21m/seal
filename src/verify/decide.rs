@@ -3681,6 +3681,74 @@ mod normalization_soundness {
         // exactly why the interval bound on the partial is load-bearing.
         assert_eq!(eval_num(&a, folded, &env), Some(1));
     }
+
+    /// Boolean truth of a node, independent of canon_accept/gather_conjuncts. A
+    /// conjunct reduces to "this must be truthy"; And/Or/Truthy compose, and a
+    /// numeric node (Cmp etc.) is truthy iff its value is nonzero.
+    fn truthy(a: &Arena, id: u32, env: &HashMap<u32, i128>) -> Option<bool> {
+        match &a.nodes[id as usize] {
+            Node::And(x, y) => Some(truthy(a, *x, env)? && truthy(a, *y, env)?),
+            Node::Or(x, y) => Some(truthy(a, *x, env)? || truthy(a, *y, env)?),
+            Node::Truthy(x) => truthy(a, *x, env),
+            Node::Const(c) => Some(*c != 0),
+            Node::Atom(i) => env.get(i).map(|v| *v != 0),
+            _ => Some(eval_num(a, id, env)? != 0),
+        }
+    }
+
+    /// The denotation of a canonical conjunct set: false if it carries the
+    /// u32::MAX false-marker, else the AND of every conjunct's truthiness.
+    fn canon_truth(a: &Arena, set: &[u32], env: &HashMap<u32, i128>) -> Option<bool> {
+        if set.contains(&u32::MAX) {
+            return Some(false);
+        }
+        let mut r = true;
+        for &id in set {
+            r = r && truthy(a, id, env)?;
+        }
+        Some(r)
+    }
+
+    /// I5: the compare-time boolean canonicalization (gather_conjuncts/push_conjunct)
+    /// is the OTHER shared identity Engine B trusts -- two accepts are proven equal
+    /// iff their canonical conjunct sets are. Validate the reduction preserves the
+    /// accept's truthiness across each identity it applies: And idempotence and
+    /// commutativity, a dropped statically-true conjunct, Truthy flattening, and a
+    /// statically-false conjunct forcing the whole accept false.
+    #[test]
+    fn canon_accept_preserves_truthiness() {
+        let mut a = Arena::new();
+        let x = a.intern(Node::Atom(0));
+        let five = a.intern(Node::Const(5));
+        let ten = a.intern(Node::Const(10));
+        let c1 = a.mk(Node::Cmp(0xa2, x, five)); // x >= 5
+        let c2 = a.mk(Node::Cmp(0xa1, x, ten)); // x <= 10
+        let t1 = a.intern(Node::Const(1));
+        let f0 = a.intern(Node::Const(0));
+        let tt = a.intern(Node::Truthy(c1));
+        let ttt = a.intern(Node::Truthy(tt)); // Truthy(Truthy(c1))
+        let inner = a.intern(Node::And(c1, c2));
+        let trees = [
+            a.intern(Node::And(c1, c1)), // idempotence
+            a.intern(Node::And(c1, t1)), // drop statically-true
+            ttt,
+            a.intern(Node::And(c1, c2)),    // ordered
+            a.intern(Node::And(c2, c1)),    // reordered (commutativity)
+            a.intern(Node::And(c1, f0)),    // statically-false -> whole false
+            a.intern(Node::And(inner, c1)), // nested + duplicate
+        ];
+        for &top in &trees {
+            let set = canon_accept(&a, top);
+            for xv in -5i128..=15 {
+                let env = HashMap::from([(0u32, xv)]);
+                assert_eq!(
+                    truthy(&a, top, &env),
+                    canon_truth(&a, &set, &env),
+                    "canon_accept changed the accept's meaning (x={xv})"
+                );
+            }
+        }
+    }
 }
 
 /// The reduced-domain exhaustive backstop:
