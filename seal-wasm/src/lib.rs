@@ -1,7 +1,7 @@
 //! `seal-wasm`: a thin, zero-dependency wasm32 shim exposing the Seal
 //! compiler to JavaScript via the raw C ABI (no wasm-bindgen).
 //!
-//! The audited `seal` crate stays dependency-free; this glue does only
+//! The `seal` crate stays dependency-free; this glue does only
 //! string marshalling across the wasm boundary, then calls the SAME pure
 //! `compile()` + `result_to_json()` the CLI uses. So a browser cannot derive a
 //! different address than the CLI for identical input -- the single shared code

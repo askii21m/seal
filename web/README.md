@@ -11,7 +11,7 @@ CLI derives, and anyone can re-verify it against the lockfile (`seal ... --verif
 - `seal-wasm/`, a thin, **zero-dependency** wasm32 shim (raw `extern "C"`,
   no `wasm-bindgen`). It marshals strings across the wasm boundary and calls the
   same `compile()` + `result_to_json()` the CLI uses, so the web path cannot
-  derive a different address. The audited compiler crate stays dependency-free.
+  derive a different address. The compiler crate stays dependency-free.
 - `web/seal.js`, a small zero-dependency loader (`Seal.load` /
   `.compile`).
 - `web/smoke.mjs`, an end-to-end test runner (node).

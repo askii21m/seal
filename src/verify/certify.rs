@@ -407,7 +407,8 @@ impl Ev<'_> {
     }
 }
 
-/// Evaluate a spend's predicate (the independent oracle `[[.]]`) at one concrete
+/// Evaluate a spend's predicate (`[[.]]`, independent of lower/optimize but the
+/// SOLE runtime evaluator; the N-version cross-check is the test-only fuzz) at one concrete
 /// witness, given as the same `(name, SatValue)` plan that drives
 /// `build_witness`. `Some(b)` is the predicate's truth; `None` is an abstain
 /// (an unmodeled construct or an `after` timelock). Exposed for `crate::verify::decide`

@@ -1,4 +1,4 @@
-// CI safety net: prove the wasm build is BYTE-FOR-BYTE identical to the audited
+// CI safety net: prove the wasm build is BYTE-FOR-BYTE identical to the
 // NATIVE build on every corpus contract. Both paths call the same compile() +
 // result_to_json(); the only thing that differs is the codegen target. A
 // wasm-specific codegen bug that changed an address (a wrong secp/hash/decide
@@ -6,7 +6,7 @@
 // comparing the full `--json` output of `seal` against the wasm output.
 //
 //   node web/crosscheck.mjs
-//   BASISC=path/to/seal WASM=path/to.wasm node web/crosscheck.mjs
+//   SEAL=path/to/seal WASM=path/to.wasm node web/crosscheck.mjs
 //
 // Defaults: native seal at target/debug/seal; wasm at
 // seal-wasm/target/wasm32-unknown-unknown/debug/seal_wasm.wasm.
@@ -19,7 +19,7 @@ import { Seal } from "./seal.js";
 const root = new URL("..", import.meta.url);
 const corpusDir = new URL("tests/corpus/", root);
 
-const seal = process.env.BASISC || fileURLToPath(new URL("target/debug/seal", root));
+const seal = process.env.SEAL || fileURLToPath(new URL("target/debug/seal", root));
 const wasmPath = process.env.WASM
   ? process.env.WASM
   : fileURLToPath(new URL("seal-wasm/target/wasm32-unknown-unknown/debug/seal_wasm.wasm", root));

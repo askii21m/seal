@@ -33,7 +33,7 @@ that every spend path enforces exactly what the source says.
 
 The goal is to make on-chain conditions something you can read, review, and trust
 without hand-auditing raw Script. You write the policy; the compiler does the
-encoding, the optimization, and the correctness proof.
+encoding, the optimization, and the per-output correctness proof.
 
 ## Example
 
@@ -69,7 +69,7 @@ contract Htlc {
 $ seal examples/htlc.sl --args examples/htlc.args.json --address
 certify `swap`: proven -- full symbolic domain (every assignment of 2 witness atoms)
 certify `refund`: certified -- 2 witnesses (exhaustive)
-address:      bc1pn03v6pjm54ex8ayvj2u68rp332xtm4qy845e38qkmmj6fal484rsyklkdk
+address:      bc1pxfryx3afulynuk6qay8cc02l9x84m60chmexayxy2mprxu2zepqqlrhvsu
 ```
 
 The three contracts in [`examples/`](examples/) are the place to start; the full
