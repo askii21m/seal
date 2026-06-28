@@ -3437,6 +3437,252 @@ mod engine_b_tests {
     }
 }
 
+/// Independent soundness checks for the Arena's normalization identities.
+///
+/// Engine B decides T1 (leaf implements predicate) PURELY STRUCTURALLY: it never
+/// executes the leaf bytes, so an unsound rewrite in `intern`/`mk` would corrupt
+/// the predicate DAG and the script DAG identically and still compare equal -- a
+/// false proof. The exhaustive gate and `certify_fuzz` execute real bytes for the
+/// corpus shapes, but a non-corpus shape reaching Engine B leans on the rewrites
+/// being sound. These tests validate each rewrite preserves meaning at the IDENTITY
+/// level, by evaluating the NORMALIZED node with a fresh denotational evaluator
+/// (`eval_num`) that shares no code with intern/mk/canon_accept and comparing to the
+/// value computed directly here. `eval_num` models CScriptNum: an operand exceeding
+/// the 4-byte domain aborts, the same point at which the script's `num` does -- so
+/// the bias-fold check is faithful at the overflow boundary, not just over Z.
+#[cfg(test)]
+mod normalization_soundness {
+    use super::*;
+    use std::collections::HashMap;
+
+    /// The 4-byte CScriptNum magnitude: an arithmetic/comparison operand must
+    /// satisfy `|v| <= CSN_MAX` or the script aborts (interp.rs `num`).
+    const CSN_MAX: i128 = (1 << 31) - 1;
+
+    fn fits4(v: i128) -> bool {
+        (-CSN_MAX..=CSN_MAX).contains(&v)
+    }
+
+    /// Read a value AND require it fit 4 bytes, the precondition OP_ADD/OP_SUB and
+    /// the comparisons impose on every operand they pop.
+    fn opnd(a: &Arena, id: u32, env: &HashMap<u32, i128>) -> Option<i128> {
+        let v = eval_num(a, id, env)?;
+        fits4(v).then_some(v)
+    }
+
+    /// Evaluate a numeric node over an atom assignment. None means the script
+    /// aborts (an operand left the 4-byte domain). Recomputed straight from the
+    /// `Node` enum: no call into the Arena's folding, so a wrong rewrite shows up
+    /// as `eval_num(normalized) != truth`.
+    fn eval_num(a: &Arena, id: u32, env: &HashMap<u32, i128>) -> Option<i128> {
+        match &a.nodes[id as usize] {
+            Node::Const(c) => Some(*c),
+            Node::Atom(i) => env.get(i).copied(),
+            // OP_ADD/OP_SUB pop two <=4-byte operands and push the (possibly
+            // 5-byte) result, which is unconstrained until the next op reads it.
+            Node::Add(x, y) => Some(opnd(a, *x, env)? + opnd(a, *y, env)?),
+            Node::Sub(x, y) => Some(opnd(a, *x, env)? - opnd(a, *y, env)?),
+            Node::Neg(x) => Some(-opnd(a, *x, env)?),
+            Node::Abs(x) => Some(opnd(a, *x, env)?.abs()),
+            Node::Min(x, y) => Some(opnd(a, *x, env)?.min(opnd(a, *y, env)?)),
+            Node::Max(x, y) => Some(opnd(a, *x, env)?.max(opnd(a, *y, env)?)),
+            Node::Within(x, lo, hi) => {
+                let x = opnd(a, *x, env)?;
+                let lo = opnd(a, *lo, env)?;
+                let hi = opnd(a, *hi, env)?;
+                Some((lo <= x && x < hi) as i128)
+            }
+            Node::Cmp(op, x, y) => {
+                let x = opnd(a, *x, env)?;
+                let y = opnd(a, *y, env)?;
+                let b = match op {
+                    0x9c => x == y,
+                    0x9e => x != y,
+                    0x9f => x < y,
+                    0xa0 => x > y,
+                    0xa1 => x <= y,
+                    _ => x >= y, // 0xa2
+                };
+                Some(b as i128)
+            }
+            _ => None, // non-numeric node: never built by these tests
+        }
+    }
+
+    /// I1: `Sub(x, <const c>)` interns as `Add(x, <const -c>)`. The rewrite must
+    /// not change the value, and must not flip the sign of the constant.
+    #[test]
+    fn sub_to_add_preserves_value() {
+        for &c in &[1i128, 5, -3, 100, -1000, CSN_MAX, -CSN_MAX] {
+            let mut a = Arena::new();
+            let x = a.intern(Node::Atom(0));
+            let cc = a.intern(Node::Const(c));
+            let node = a.intern(Node::Sub(x, cc));
+            assert!(
+                matches!(a.nodes[node as usize], Node::Add(..)),
+                "Sub(x, const) should normalize to Add"
+            );
+            for xv in -200i128..=200 {
+                let env = HashMap::from([(0u32, xv)]);
+                assert_eq!(eval_num(&a, node, &env), Some(xv - c), "x={xv} c={c}");
+            }
+        }
+    }
+
+    /// I2: commutative `Add` interns to one id, and that id still means `x + y`.
+    #[test]
+    fn add_commute_preserves_value() {
+        let mut a = Arena::new();
+        let x = a.intern(Node::Atom(0));
+        let y = a.intern(Node::Atom(1));
+        let xy = a.intern(Node::Add(x, y));
+        let yx = a.intern(Node::Add(y, x));
+        assert_eq!(xy, yx, "Add(a,b) and Add(b,a) should share one id");
+        for xv in [-5i128, 0, 9, CSN_MAX] {
+            for yv in [-7i128, 0, 3, -CSN_MAX] {
+                let env = HashMap::from([(0u32, xv), (1u32, yv)]);
+                assert_eq!(eval_num(&a, xy, &env), Some(xv + yv), "x={xv} y={yv}");
+            }
+        }
+    }
+
+    /// The script's own meaning of `(x + c) op k`, recomputed independently:
+    /// OP_ADD requires x and c in the 4-byte domain and pushes x+c; the comparison
+    /// then requires x+c and k in the domain, else the script aborts (rejects).
+    fn unfolded_bias(x: i128, c: i128, op: u8, k: i128) -> Option<i128> {
+        if !fits4(x) || !fits4(c) {
+            return None;
+        }
+        let s = x + c;
+        if !fits4(s) || !fits4(k) {
+            return None;
+        }
+        let b = match op {
+            0x9c => s == k,
+            0x9e => s != k,
+            0x9f => s < k,
+            0xa0 => s > k,
+            0xa1 => s <= k,
+            _ => s >= k,
+        };
+        Some(b as i128)
+    }
+
+    /// I3: `Cmp(op, Add(x, <const c>), <const k>)` folds to `Cmp(op, x, <const k-c>)`.
+    /// This is the rewrite to watch: sound over Z but the unfolded script aborts when
+    /// `x+c` leaves the 4-byte domain, so the fold is only sound where the interval
+    /// engine keeps the partial in range. Over that domain the folded node must agree
+    /// with the unfolded meaning for every op and every x.
+    #[test]
+    fn bias_fold_preserves_meaning() {
+        let ops = [0x9cu8, 0x9e, 0x9f, 0xa0, 0xa1, 0xa2];
+        // The fold has two arms (the const operand as the Add's lhs vs its rhs).
+        // Which arm fires is decided by canonical operand order (interned id), so
+        // vary which of the atom/const we intern first to exercise BOTH arms.
+        for &const_first in &[false, true] {
+            for &c in &[1i128, 5, -3, 7, -10] {
+                for &k in &[0i128, 10, -10, 3] {
+                    for &op in &ops {
+                        let mut a = Arena::new();
+                        let (x, cc) = if const_first {
+                            let cc = a.intern(Node::Const(c));
+                            (a.intern(Node::Atom(0)), cc)
+                        } else {
+                            (a.intern(Node::Atom(0)), a.intern(Node::Const(c)))
+                        };
+                        let kk = a.intern(Node::Const(k));
+                        let add = a.mk(Node::Add(x, cc));
+                        let folded = a.mk(Node::Cmp(op, add, kk));
+                        // The fold must have fired: lhs is now the bare atom.
+                        if let Node::Cmp(_, lhs, _) = a.nodes[folded as usize] {
+                            assert!(
+                                matches!(a.nodes[lhs as usize], Node::Atom(_)),
+                                "bias fold should leave the atom as the comparison lhs"
+                            );
+                        } else {
+                            panic!("expected a Cmp node");
+                        }
+                        for xv in -60i128..=60 {
+                            let env = HashMap::from([(0u32, xv)]);
+                            assert_eq!(
+                                eval_num(&a, folded, &env),
+                                unfolded_bias(xv, c, op, k),
+                                "const_first={const_first} x={xv} c={c} k={k} op={op:#x}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// I4: `mk` constant-folds all-const arithmetic/comparison to a `Const`. The
+    /// folded value must equal the operation it replaces.
+    #[test]
+    fn const_fold_preserves_value() {
+        let vals = [0i128, 1, -1, 7, -7, 1000, CSN_MAX, -CSN_MAX];
+        for &x in &vals {
+            for &y in &vals {
+                let mut a = Arena::new();
+                let cx = a.intern(Node::Const(x));
+                let cy = a.intern(Node::Const(y));
+                let add = a.mk(Node::Add(cx, cy));
+                assert_eq!(eval_num(&a, add, &HashMap::new()), Some(x + y), "{x}+{y}");
+                let cx = a.intern(Node::Const(x));
+                let cy = a.intern(Node::Const(y));
+                let sub = a.mk(Node::Sub(cx, cy));
+                assert_eq!(eval_num(&a, sub, &HashMap::new()), Some(x - y), "{x}-{y}");
+                for &op in &[0x9cu8, 0x9e, 0x9f, 0xa0, 0xa1, 0xa2] {
+                    let cx = a.intern(Node::Const(x));
+                    let cy = a.intern(Node::Const(y));
+                    let cmp = a.mk(Node::Cmp(op, cx, cy));
+                    assert!(
+                        matches!(a.nodes[cmp as usize], Node::Const(_)),
+                        "Cmp of two consts should fold to a Const"
+                    );
+                    let truth = match op {
+                        0x9c => x == y,
+                        0x9e => x != y,
+                        0x9f => x < y,
+                        0xa0 => x > y,
+                        0xa1 => x <= y,
+                        _ => x >= y,
+                    } as i128;
+                    assert_eq!(
+                        eval_num(&a, cmp, &HashMap::new()),
+                        Some(truth),
+                        "{x} {op:#x} {y}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The bias fold is denotation-preserving ONLY inside the 4-byte domain: past
+    /// it the script's `(x+c) op k` ABORTS (a 5-byte operand) while the folded
+    /// `x op (k-c)` does not, so the two disagree. This pins the cross-component
+    /// invariant the fold leans on -- the interval engine bounds every partial sum
+    /// (intervals.rs `result_fits`), so any contract whose `x+c` could overflow is
+    /// rejected before Engine B ever applies the fold, keeping it on the domain
+    /// where it is sound. If that bound is ever weakened, this fold reopens.
+    #[test]
+    fn bias_fold_is_sound_only_within_the_4byte_domain() {
+        let mut a = Arena::new();
+        let x = a.intern(Node::Atom(0));
+        let c = a.intern(Node::Const(1000));
+        let k = a.intern(Node::Const(0));
+        let add = a.mk(Node::Add(x, c));
+        let folded = a.mk(Node::Cmp(0xa2, add, k)); // (x + 1000) >= 0
+        let xv = CSN_MAX; // x + 1000 leaves the 4-byte domain
+        let env = HashMap::from([(0u32, xv)]);
+        // The real script aborts reading the 5-byte x+1000, so it rejects:
+        assert_eq!(unfolded_bias(xv, 1000, 0xa2, 0), None);
+        // The folded node does not abort -- it would accept. The disagreement is
+        // exactly why the interval bound on the partial is load-bearing.
+        assert_eq!(eval_num(&a, folded, &env), Some(1));
+    }
+}
+
 /// The reduced-domain exhaustive backstop:
 /// the GATE every Int engine must pass before it ships. `try_prove` claims
 /// equivalence over the COMPLETE domain; a box `[-M', M']ⁿ` is a subset of it,
