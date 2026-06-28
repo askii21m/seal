@@ -215,8 +215,9 @@ fn threshold_fragment(item: &Expr, env: &Env) -> Option<String> {
 
 fn hex(b: &[u8]) -> String {
     use std::fmt::Write;
-    b.iter().fold(String::with_capacity(b.len() * 2), |mut s, x| {
-        let _ = write!(s, "{x:02x}");
-        s
-    })
+    b.iter()
+        .fold(String::with_capacity(b.len() * 2), |mut s, x| {
+            let _ = write!(s, "{x:02x}");
+            s
+        })
 }

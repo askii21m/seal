@@ -653,8 +653,11 @@ impl<'a> Lowerer<'a> {
         // match the typed predicate, or the leaf would under-constrain the
         // witness. Emit the copy-form airlock for any leftover before CLEANSTACK.
         if !self.pending_airlock.is_empty() {
-            let leftover: Vec<(String, i64)> =
-                self.pending_airlock.iter().map(|(k, v)| (k.clone(), *v)).collect();
+            let leftover: Vec<(String, i64)> = self
+                .pending_airlock
+                .iter()
+                .map(|(k, v)| (k.clone(), *v))
+                .collect();
             for (slot, n) in leftover {
                 self.pending_airlock.remove(&slot);
                 let span = s

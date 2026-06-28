@@ -487,9 +487,7 @@ impl<'a> Analyzer<'a> {
                     // than M slots can carry valid sigs, so a third party can strip
                     // an excess one to empty and stay above the bound. (`== M`, and
                     // `>= n` which forces all n, leave no excess.)
-                    if matches!(op, CmpOp::Ge | CmpOp::Gt)
-                        && min_required < checks.len() as i128
-                    {
+                    if matches!(op, CmpOp::Ge | CmpOp::Gt) && min_required < checks.len() as i128 {
                         facts.malleable_threshold = Some(item.span());
                     }
                 }
