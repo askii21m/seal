@@ -4,7 +4,7 @@ The compiler runs entirely in the browser as WebAssembly, **there is no
 server**. Hosting is static files (the `.wasm` + `seal.js` + your page) on
 any CDN/Pages/IPFS. Because compilation is a pure, deterministic function of
 `(source, args)`, the address you get in the browser is the same one the `seal`
-CLI derives, and anyone can re-verify it against the lockfile (`seal … --verify`).
+CLI derives, and anyone can re-verify it against the lockfile (`seal ... --verify`).
 
 ## Pieces
 

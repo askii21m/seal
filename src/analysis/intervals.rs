@@ -325,7 +325,7 @@ impl<'a> Engine<'a> {
                 "bounds/operand",
                 format!(
                     "this value is pushed on-chain but cannot fit the 4-byte CScriptNum \
-                     domain ±{MACHINE_MAX}: proven range [{}, {}]",
+                     domain +/-{MACHINE_MAX}: proven range [{}, {}]",
                     iv.lo, iv.hi
                 ),
                 span,
@@ -360,7 +360,7 @@ impl<'a> Engine<'a> {
             Diagnostic::error(
                 "bounds/overflow",
                 format!(
-                    "this result can reach [{}, {}], outside the 4-byte CScriptNum domain ±{MACHINE_MAX}",
+                    "this result can reach [{}, {}], outside the 4-byte CScriptNum domain +/-{MACHINE_MAX}",
                     iv.lo, iv.hi
                 ),
                 node_span,

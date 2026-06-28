@@ -136,7 +136,7 @@ fn bind_value(name: &str, ty: &Ty, json: &Json, env: &Env) -> Result<ConstValue,
         Ty::Int => match json {
             Json::Int(v) if v.unsigned_abs() <= MACHINE_MAX as u128 => Ok(ConstValue::Int(*v)),
             Json::Int(v) => Err(format!(
-                "`{name}`: {v} does not fit the 4-byte CScriptNum domain ±{MACHINE_MAX}"
+                "`{name}`: {v} does not fit the 4-byte CScriptNum domain +/-{MACHINE_MAX}"
             )),
             other => Err(type_err(name, "an integer", other)),
         },

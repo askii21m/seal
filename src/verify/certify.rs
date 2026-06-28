@@ -407,7 +407,7 @@ impl Ev<'_> {
     }
 }
 
-/// Evaluate a spend's predicate (the independent oracle `⟦·⟧`) at one concrete
+/// Evaluate a spend's predicate (the independent oracle `[[.]]`) at one concrete
 /// witness, given as the same `(name, SatValue)` plan that drives
 /// `build_witness`. `Some(b)` is the predicate's truth; `None` is an abstain
 /// (an unmodeled construct or an `after` timelock). Exposed for `crate::verify::decide`
@@ -728,7 +728,7 @@ pub enum CertStatus {
 /// What a symbolic `Proven` verdict actually established (see `crate::verify::decide`).
 #[derive(Debug, Clone)]
 pub enum ProvenKind {
-    /// Engine A (single Int witness var): T1 (naive ⟺ predicate) AND T2 (opt ⟺
+    /// Engine A (single Int witness var): T1 (naive <=> predicate) AND T2 (opt <=>
     /// naive) over EVERY CScriptNum value of the Int param, by breakpoint-cell
     /// decomposition of the machine domain. `breakpoints` is the cell count.
     FullInt { var: String, breakpoints: usize },
@@ -738,7 +738,7 @@ pub enum ProvenKind {
     /// structural equality of the symbolic stack functions decoded from the
     /// actual script bytes.
     FullSymbolic { atoms: usize },
-    /// Engine B, partial: T2 (opt ⟺ naive) proven over the full domain -- the
+    /// Engine B, partial: T2 (opt <=> naive) proven over the full domain -- the
     /// optimizer is certified out of the TCB for this leaf -- but the predicate
     /// evaluator could not be symbolically matched, so T1 stays differential.
     T2OnlySymbolic { atoms: usize, t1_reason: String },

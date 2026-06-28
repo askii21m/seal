@@ -4,7 +4,7 @@
 //! this module PROVES the three-way equivalence
 //!
 //! ```text
-//! eval_predicate  ⟺  exec(naive)  ⟺  exec(optimized)
+//! eval_predicate  <=>  exec(naive)  <=>  exec(optimized)
 //! ```
 //!
 //! over the leaf's COMPLETE domain, without enumeration.
@@ -30,7 +30,7 @@
 //! parameter finitely enumerable: `Bool`/`Signature`/arrays of those), fix the
 //! other parameters to each of their finitely-many values ("slices"). Within a
 //! slice the leaf is a function of `x` alone. We prove three-way agreement over
-//! the ENTIRE machine domain `M = ±(2^31-1)` like so:
+//! the ENTIRE machine domain `M = +/-(2^31-1)` like so:
 //!
 //!  1. Symbolically execute the naive and optimized scripts, and walk the source
 //!     predicate, as PIECEWISE-AFFINE functions of `x`, collecting a SUPERSET of
@@ -50,7 +50,7 @@
 //!     non-minimal) is rejected by `num(v,4)` on the first numeric op that
 //!     consumes it -- and in this fragment `x` is ONLY ever consumed numerically
 //!     (else step 1 abstains) -- so BOTH scripts reject it identically. We
-//!     confirm at `±(M+1)` and argue the rest structurally.
+//!     confirm at `+/-(M+1)` and argue the rest structurally.
 //!
 //! Engine A abstains on `OP_IF`/`OP_NOTIF` (branching), bytewise `OP_EQUAL`,
 //! `OP_SIZE`, the hash ops, and CLTV/CSV -- none appear in a single-Int affine
@@ -1292,7 +1292,7 @@ fn decode_minimal(v: &[u8]) -> Result<i64, ()> {
 // three-way. No lattice search -- the 1-D completeness argument applies on each
 // axis independently, and every integer point of every grid cell (and every
 // integer-containing face) is hit because each axis's cover hits every 1-D cell
-// AND every breakpoint and `±1`. The thin-band unsoundness cannot arise: there
+// AND every breakpoint and `+/-1`. The thin-band unsoundness cannot arise: there
 // are NO diagonal hyperplanes, so a cell's lattice points are never confined to a
 // non-representative coordinate.
 //
@@ -1310,10 +1310,10 @@ fn decode_minimal(v: &[u8]) -> Result<i64, ()> {
 // A: re-executing the ACTUAL naive/opt bytes and the predicate at each grid point
 // is what decides agreement; the arrangement math only chooses WHERE to sample.
 // Because no atom couples the axes (every cross-axis op abstains), the
-// accept-function is SEPARABLE -- `accept(x) = C . Π_i F_i(x_i)` -- so `F_i`'s
+// accept-function is SEPARABLE -- `accept(x) = C . prod_i F_i(x_i)` -- so `F_i`'s
 // breakpoints are exactly `live[i].cuts`, and the grid of the `n` 1-D covers is
 // complete. The exponential blow-up of the product is bounded by a CELL CAP:
-// over the cap -> abstain -> `Unbounded` (graceful degradation, §3.6). The
+// over the cap -> abstain -> `Unbounded` (graceful degradation, section 3.6). The
 // reduced-domain exhaustive gate validates completeness on n-D boxes (n = 2, 3).
 
 /// Per-slice grid cap: abstain if a single slice's n-D grid exceeds this (safe ->
@@ -1443,7 +1443,7 @@ fn total_cuts_n(stack: &[SymValN], live: &[Pwa]) -> usize {
 /// accept-functions `live[i]`: 0/1 piecewise functions whose cuts are the
 /// breakpoints of axis `i` in the script's accept-function. Because every binary
 /// op abstains on a cross-axis combine, the accept is separable
-/// `C . Π_i live[i](x_i)`, so each `live[i]` carries the complete breakpoint set
+/// `C . prod_i live[i](x_i)`, so each `live[i]` carries the complete breakpoint set
 /// for axis `i`. `None` on any opcode outside the modeled fragment, a coupling
 /// atom, a stack/type error, or a cut-count blowup -- all of which make the engine
 /// abstain (sound).
@@ -1454,7 +1454,7 @@ fn sym_accept_n(
     n_vars: usize,
 ) -> Option<Vec<Pwa>> {
     let mut stack = init;
-    // The accept is `(Π_i live[i](x_i)) AND (any const conjunct)`; each
+    // The accept is `(prod_i live[i](x_i)) AND (any const conjunct)`; each
     // VERIFY/...VERIFY/top condition folds into the axis it belongs to. A const
     // condition contributes no cut (its truth is decided by re-execution), so it
     // is not folded -- the cut superset is unaffected and re-execution anchors it.
@@ -2341,7 +2341,7 @@ struct IfFrame {
 /// out-of-`M` (the range check `x in lo..hi` is false there), so script and
 /// predicate agree over the whole domain and the structural equality is sound.
 /// Unbounded Int leaves stay with Engine A/A_n (which handle out-of-`M` via
-/// explicit `±(M+1)` sentinels) or remain `Unbounded`.
+/// explicit `+/-(M+1)` sentinels) or remain `Unbounded`.
 fn all_ints_bounded(body: &[Stmt], sig: &SpendSig, env: &Env) -> bool {
     let m = MACHINE_MAX;
     sig.params
@@ -3753,7 +3753,7 @@ mod normalization_soundness {
 
 /// The reduced-domain exhaustive backstop:
 /// the GATE every Int engine must pass before it ships. `try_prove` claims
-/// equivalence over the COMPLETE domain; a box `[-M', M']ⁿ` is a subset of it,
+/// equivalence over the COMPLETE domain; a box `[-M', M']^n` is a subset of it,
 /// so a genuine proof MUST hold on the box. We therefore enumerate the box
 /// exhaustively and assert: if `try_prove` returns Proven, naive == opt ==
 /// predicate at EVERY box point. A disagreement under a Proven verdict is a
@@ -3888,7 +3888,7 @@ mod exhaustive_gate {
     }
 
     /// For every leaf the engine PROVES, assert the box agrees -- i.e. no false
-    /// proof manifests within `[-m, m]ⁿ`.
+    /// proof manifests within `[-m, m]^n`.
     fn assert_no_false_proof(src: &str, args: &str, m: i64) {
         let (c, info, env, naive, opt) = build(src, args);
         let oracle = |_pk: &[u8], s: &[u8]| s == MARKER.as_slice();
@@ -4270,7 +4270,7 @@ mod exhaustive_gate {
         assert_no_false_proof(src, &args, 12);
     }
 
-    /// `engine_an`'s graceful degradation (§3.6) is now an INTERNAL property: five
+    /// `engine_an`'s graceful degradation (section 3.6) is now an INTERNAL property: five
     /// decoupled axes blow its per-slice cell cap, so it returns a clean `None`
     /// (no crash/OOM). `try_prove` then proves the leaf via Engine B's LINEAR
     /// structural equality, which has no grid blowup -- the cap protects the grid

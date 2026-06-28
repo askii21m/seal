@@ -45,7 +45,7 @@ pub struct SpendCost {
     pub name: String,
     /// The revealed leaf script, in bytes.
     pub script_bytes: usize,
-    /// The control block (`0xc0|parity ‖ internal_key ‖ merkle_path`), in bytes.
+    /// The control block (`0xc0|parity || internal_key || merkle_path`), in bytes.
     pub control_bytes: usize,
     /// The worst-case witness STACK elements (the satisfaction), in bytes
     /// (excludes script + control, which are separate stack items).

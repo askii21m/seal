@@ -616,7 +616,7 @@ mod kani_proofs {
     use crate::codegen::script::encode_num;
 
     /// The lowering's CScriptNum encoder and the interpreter's decoder are
-    /// EXACT INVERSES over the whole 4-byte operand domain (±(2^31-1)). This is
+    /// EXACT INVERSES over the whole 4-byte operand domain (+/-(2^31-1)). This is
     /// a machine-checked slice of the lowering<->interpreter agreement: for
     /// EVERY representable operand, what the compiler emits is what the
     /// interpreter reads back.
