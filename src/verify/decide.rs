@@ -2435,20 +2435,31 @@ fn pred_to_sym(
     let mut scope: Vec<(String, u32)> = Vec::new();
     let mut accept = a.intern(Node::Const(1));
     // The fixed-length airlocks the lowering emits for sized witness data
-    // (`OP_SIZE <N> EQUALVERIFY` for `Bytes<N>`, decoded as a numeric length
-    // check -- see decode_to_sym's 0x88 case) are part of the typed
-    // predicate's domain: a `Bytes<N>` value IS N bytes. Encode that so the
-    // accept-function matches the script over the full witness domain (both
-    // reject a wrong-length witness), not just the typed sub-domain.
+    // (`OP_SIZE <N> EQUALVERIFY`, decoded as a numeric length check -- see
+    // decode_to_sym's 0x88 case) are part of the typed predicate's domain: a
+    // `Bytes<N>` value IS N bytes, a `Hash<Alg>` value IS the algorithm's digest
+    // length. The lowering airlocks BOTH (lower.rs `byte_len` covers Bytes and
+    // Hash; scalars via `pending_airlock`, arrays one airlock per Bytes/Hash
+    // element). Encode every one so the accept-function matches the script over
+    // the full witness domain (both reject a wrong-length witness), not just the
+    // typed sub-domain. (Skipping `Hash` here under-certified a `Hash<Sha256>`
+    // witness whose script is BYTE-IDENTICAL to its `Bytes<32>` twin: T1 failed
+    // to unify because only the script side carried the airlock node.)
     for p in &sig.params {
-        if let Ty::Bytes(Len::Lit(nbytes)) = &p.ty
-            && let Some(i) = atom_id(atoms, &p.name)
-        {
-            let atom = a.intern(Node::Atom(i));
-            let sz = a.intern(Node::Size(atom));
-            let want = a.intern(Node::Const(*nbytes as i128));
-            let g = a.mk(Node::Cmp(0x9c, sz, want)); // SIZE == N
-            accept = a.intern(Node::And(accept, g));
+        match &p.ty {
+            Ty::Array(elem, len) => {
+                if let (Some(nbytes), Some(n)) = (airlock_len(elem), resolve_len(len, env)) {
+                    for i in 0..n {
+                        let slot = format!("{}[{i}]", p.name);
+                        accept = and_size_airlock(a, accept, atoms, &slot, nbytes);
+                    }
+                }
+            }
+            ty => {
+                if let Some(nbytes) = airlock_len(ty) {
+                    accept = and_size_airlock(a, accept, atoms, &p.name, nbytes);
+                }
+            }
         }
     }
     for stmt in body {
@@ -2470,6 +2481,36 @@ fn pred_to_sym(
         }
     }
     Some(accept)
+}
+
+/// The fixed witness byte length the lowering guards with a `SIZE <n>
+/// EQUALVERIFY` airlock: `Bytes<N>` and every `Hash<Alg>` (mirroring lower.rs
+/// `byte_len`). `None` for types with no such airlock in this fragment -- Int,
+/// Bool, Signature, and PublicKey (a witness key is consumed via `.check`, not
+/// as a value here, so it never reaches a FullSymbolic predicate). `Bytes` with
+/// a NAMED length is left to the existing Lit-only path (unchanged behaviour).
+fn airlock_len(ty: &Ty) -> Option<i128> {
+    use crate::analysis::sema::HashAlg;
+    match ty {
+        Ty::Bytes(Len::Lit(n)) => Some(*n as i128),
+        Ty::Hash(HashAlg::Sha256 | HashAlg::Hash256) => Some(32),
+        Ty::Hash(_) => Some(20),
+        _ => None,
+    }
+}
+
+/// AND the `SIZE == nbytes` airlock for one witness slot into `accept`, but only
+/// when the slot is LIVE (present in `atoms`). A dead slot carries no airlock in
+/// the decoded script either, so skipping it keeps predicate and script in step.
+fn and_size_airlock(a: &mut Arena, accept: u32, atoms: &[String], slot: &str, nbytes: i128) -> u32 {
+    let Some(i) = atom_id(atoms, slot) else {
+        return accept;
+    };
+    let atom = a.intern(Node::Atom(i));
+    let sz = a.intern(Node::Size(atom));
+    let want = a.intern(Node::Const(nbytes));
+    let g = a.mk(Node::Cmp(0x9c, sz, want)); // SIZE == N
+    a.intern(Node::And(accept, g))
 }
 
 fn atom_id(atoms: &[String], slot: &str) -> Option<u32> {

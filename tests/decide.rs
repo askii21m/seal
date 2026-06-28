@@ -611,3 +611,81 @@ fn hashlock_full_symbolic_matches_real_sha256() {
         }
     }
 }
+
+/// Construct-coverage parity: a `Hash<Alg>` witness compared by `==` lowers to a
+/// script BYTE-IDENTICAL to its `Bytes<N>` twin (both carry the `SIZE <n>
+/// EQUALVERIFY` airlock the lowering emits for sized witness data). Before
+/// pred_to_sym's airlock loop handled `Hash`, only the `Bytes` twin certified
+/// FullSymbolic while the `Hash` one fell back to T2-only on identical bytes --
+/// a benign over-restriction (the gate refused funding), but a real gap. Pin the
+/// two equal: same script, same FullSymbolic verdict.
+#[test]
+fn hash_witness_equality_matches_bytes_twin_full_symbolic() {
+    let target = "ab".repeat(32);
+    let args = format!("{{\"k\":\"{KEY}\",\"target\":\"0x{target}\"}}");
+    let mk = |wty: &str, cty: &str| {
+        format!(
+            "contract C {{ extern const k: PublicKey; extern const target: {cty};
+                spend claim(h: {wty}, signature: Signature) {{
+                    require {{ h == target, k.check(signature) }}
+                }} keypath None; }}"
+        )
+    };
+    let (cb, ib, eb, nb) = pipeline(&mk("Bytes<32>", "Bytes<32>"), &args);
+    let (ch, ih, eh, nh) = pipeline(&mk("Hash<Sha256>", "Hash<Sha256>"), &args);
+
+    // The type distinction is erased by lowering: byte-for-byte the same script.
+    let bscript = &nb.iter().find(|l| l.name == "claim").unwrap().script;
+    let hscript = &nh.iter().find(|l| l.name == "claim").unwrap().script;
+    assert_eq!(
+        bscript, hscript,
+        "Hash<Sha256> and Bytes<32> witnesses must lower to an identical script"
+    );
+
+    for (label, c, info, env, naive) in [
+        ("Bytes<32>", &cb, &ib, &eb, &nb),
+        ("Hash<Sha256>", &ch, &ih, &eh, &nh),
+    ] {
+        let opt: Vec<LoweredLeaf> = naive.iter().map(optimize).collect();
+        let rs = run_certify(c, info, env, naive, &opt);
+        assert!(
+            matches!(
+                status(&rs, "claim"),
+                CertStatus::Proven {
+                    kind: ProvenKind::FullSymbolic { .. }
+                }
+            ),
+            "{label} witness `h == target` should be Proven(FullSymbolic), got {:?}",
+            status(&rs, "claim")
+        );
+    }
+}
+
+/// Arrays mirror the scalar airlock per element: an array of `Hash<Sha256>`
+/// witnesses, each `== a commitment`, certifies FullSymbolic -- every element's
+/// `SIZE 32 EQUALVERIFY` airlock is reflected on the predicate side, just as the
+/// lowering emits one per Bytes/Hash array element.
+#[test]
+fn hash_array_elementwise_equality_is_full_symbolic() {
+    let t0 = "ab".repeat(32);
+    let t1 = "cd".repeat(32);
+    let args = format!("{{\"k\":\"{KEY}\",\"t0\":\"0x{t0}\",\"t1\":\"0x{t1}\"}}");
+    let src = "contract A { extern const k: PublicKey;
+        extern const t0: Hash<Sha256>; extern const t1: Hash<Sha256>;
+        spend claim(relaxed hs: [Hash<Sha256>; 2], signature: Signature) {
+            require { hs[0] == t0, hs[1] == t1, k.check(signature) }
+        } keypath None; }";
+    let (c, info, env, naive) = pipeline(src, &args);
+    let opt: Vec<LoweredLeaf> = naive.iter().map(optimize).collect();
+    let rs = run_certify(&c, &info, &env, &naive, &opt);
+    assert!(
+        matches!(
+            status(&rs, "claim"),
+            CertStatus::Proven {
+                kind: ProvenKind::FullSymbolic { .. }
+            }
+        ),
+        "array-of-Hash element-wise equality should be Proven(FullSymbolic), got {:?}",
+        status(&rs, "claim")
+    );
+}
