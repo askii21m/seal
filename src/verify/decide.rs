@@ -4384,4 +4384,45 @@ mod exhaustive_gate {
             "box_agrees failed to detect the planted in-branch divergence"
         );
     }
+
+    /// PIN that the gate's structural contracts actually reach Engine B's SYMBOLIC
+    /// path -- the shared-arena structural equality the `normalization_soundness`
+    /// tests validate -- and are not silently routed to Engine A's affine grid
+    /// (FullInt) or abstained on. The gate_proves_* tests above ground these leaves
+    /// in box execution but ground WHATEVER try_prove proves, so a routing change
+    /// could degrade them off the symbolic path while the grounding still passes.
+    /// Both FullSymbolic (T1 also symbolic) and T2OnlySymbolic (T1 via the execution
+    /// differential) go through Engine B's canon_accept over the normalized DAGs;
+    /// FullInt does not. So we pin the verdict to that pair. (Genuinely-FullSymbolic
+    /// shapes -- count, hashlock -- are asserted and brute-forced in certify_fuzz.)
+    #[test]
+    fn gate_pins_engine_b_symbolic_path() {
+        use crate::verify::certify::{CertStatus, ProvenKind, certify};
+        let coupled = "contract C3 { extern const k: PublicKey;
+            spend f(relaxed a: Int, relaxed b: Int, relaxed c: Int, s: Signature) {
+                require { a in 0..8, b in 0..8, c in 0..8, b < c, k.check(s) }
+            } keypath None; }";
+        let cross_branch = "contract SX { extern const k: PublicKey;
+            spend f(relaxed a: Int, relaxed b: Int, relaxed c: Int, s: Signature) {
+                require { a in 0..8, b in 0..8, c in 0..8, select(a > 4, then: b, else: c) >= 2, k.check(s) }
+            } keypath None; }";
+        let args = format!(r#"{{"k": "{KEY}"}}"#);
+        let oracle = |_pk: &[u8], s: &[u8]| s == MARKER.as_slice();
+        let ctx = test_ctx(&oracle);
+        for src in [coupled, cross_branch] {
+            let (c, info, env, naive, opt) = build(src, &args);
+            let reports = certify(&c, &info, &env, &naive, &opt, &MARKER, &ctx);
+            let r = reports.iter().find(|r| r.name == "f").expect("leaf f");
+            assert!(
+                matches!(
+                    r.status,
+                    CertStatus::Proven {
+                        kind: ProvenKind::FullSymbolic { .. } | ProvenKind::T2OnlySymbolic { .. }
+                    }
+                ),
+                "expected Engine B symbolic path (FullSymbolic or T2OnlySymbolic), got {:?}",
+                r.status
+            );
+        }
+    }
 }
