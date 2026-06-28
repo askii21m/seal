@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/AskiiDev/seal/actions/workflows/ci.yml"><img src="https://github.com/AskiiDev/seal/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/askii21m/seal/actions/workflows/ci.yml"><img src="https://github.com/askii21m/seal/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   &nbsp;
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" />
   &nbsp;

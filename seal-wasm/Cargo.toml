@@ -1,6 +1,6 @@
 [package]
 name = "seal-wasm"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Thin wasm32 FFI shim exposing the Seal compiler to JavaScript via the raw C ABI. Zero-dependency on purpose (no wasm-bindgen): the compiler crate's no-dependency TCB stays intact; this crate does only string marshalling across the wasm boundary."
 license = "MIT"

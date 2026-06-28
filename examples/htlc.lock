@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "compiler": "seal 0.1.0",
+  "compiler": "seal 0.2.0",
   "target": "bitcoin-mainnet-tapscript-v1",
   "source_sha256": "a220be9ee2b538b2ea171e0c564ee070decd35bde6b74ec40717d15ad115c498",
   "args_sha256": "f2a350560fc0e8e0a08daec2165459731f7f7f64be85f7e26af71baa585595f9",
