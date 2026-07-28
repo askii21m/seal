@@ -27,14 +27,39 @@ const check = (cond, msg, ctx) => {
   }
 };
 
-// 1. A proven corpus contract: a fundable mainnet address + a clean gate.
+// 1. A proven corpus contract: a fundable test-network address + a clean gate.
 {
   const r = bs.compile(ex("multisig.sl"), { args: ex("multisig.args.json"), target: "fund" });
   check(r.ok === true, "multisig ok", r.diagnostics);
-  check(typeof r.address === "string" && r.address.startsWith("bc1p"), "multisig address is bc1p", r.address);
+  check(typeof r.address === "string" && r.address.startsWith("tb1p"), "multisig address is tb1p", r.address);
   check(r.gate && r.gate.mayProceed === true, "multisig gate mayProceed", r.gate);
   check(Array.isArray(r.certification) && r.certification.length > 0, "multisig has certification", r.certification);
   check(Array.isArray(r.leaves) && r.leaves[0] && typeof r.leaves[0].hex === "string", "multisig has lowered leaves", r.leaves);
+}
+
+// 1b. NO MAINNET, the safety property of the browser build. Every network name,
+// including nonsense and the mainnet name itself, must land on a test network.
+// The wasm is a public playground running alpha code; nothing it emits may be
+// able to hold real value.
+{
+  const src = ex("multisig.sl");
+  const args = ex("multisig.args.json");
+  const seen = [];
+  for (const network of ["testnet", "signet", "regtest", "mainnet", "bc", "", undefined, "nonsense"]) {
+    const r = bs.compile(src, { args, target: "fund", network });
+    seen.push([network, r.address]);
+    check(
+      typeof r.address === "string" && !r.address.startsWith("bc1"),
+      `network ${JSON.stringify(network)} is not mainnet`,
+      r.address,
+    );
+  }
+  const regtest = bs.compile(src, { args, target: "fund", network: "regtest" });
+  check(regtest.address.startsWith("bcrt1p"), "regtest address is bcrt1p", regtest.address);
+  const testnet = bs.compile(src, { args, target: "fund", network: "testnet" });
+  const signet = bs.compile(src, { args, target: "fund", network: "signet" });
+  check(testnet.address === signet.address, "signet and testnet share the tb prefix", seen);
+  check(regtest.address !== testnet.address, "regtest differs from testnet", seen);
 }
 
 // 2. Determinism: the browser address must equal a second run byte-for-byte.

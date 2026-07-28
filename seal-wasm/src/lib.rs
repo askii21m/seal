@@ -11,12 +11,20 @@
 //! ```text
 //!   bs_alloc(len) -> ptr            JS allocates a buffer in wasm memory
 //!   bs_free(ptr, len)               JS frees a buffer
-//!   bs_compile(srcPtr, srcLen, argsPtr, argsLen, target, allowUnproven) -> outPtr
+//!   bs_compile(srcPtr, srcLen, argsPtr, argsLen, target, allowUnproven, network) -> outPtr
 //!       returns a length-prefixed buffer: [u32 LE jsonLen][jsonLen UTF-8 bytes].
 //!       JS reads jsonLen, decodes the JSON, then bs_free(outPtr, 4 + jsonLen).
 //!   argsPtr == 0 (null) means "no args".
 //!   target: 0=Check 1=Lower 2=Certify 3=Cost else=Fund.
+//!   network: 0=signet/testnet (tb) 1=regtest (bcrt); any other value is testnet.
 //! ```
+//!
+//! NO MAINNET. This shim deliberately cannot encode a mainnet address: `network`
+//! maps only onto test-network prefixes, and an unrecognized value falls back to
+//! testnet rather than mainnet. The browser build is a public playground running
+//! alpha, unaudited code, so an address it produces must never be able to hold
+//! real value, however the caller is configured. Mainnet stays behind the CLI's
+//! explicit `--network mainnet`, where the user is a deliberate operator.
 //!
 //! Totality: invalid UTF-8 input is reported as a structured JSON error, never a
 //! trap. The compiler itself is already total and deterministic.
@@ -67,6 +75,7 @@ pub extern "C" fn bs_compile(
     args_len: usize,
     target: u32,
     allow_unproven: u32,
+    network: u32,
 ) -> *mut u8 {
     let source = match unsafe { read_str(src_ptr, src_len) } {
         Some(s) => s,
@@ -87,7 +96,13 @@ pub extern "C" fn bs_compile(
         3 => Target::Cost,
         _ => Target::Fund,
     };
-    let opts = CompileOptions { allow_unproven: allow_unproven != 0, hrp: "bc" };
+    // Test networks only, and anything unrecognized lands on testnet: there is
+    // no input to this function that yields a mainnet address.
+    let hrp = match network {
+        1 => "bcrt",
+        _ => "tb",
+    };
+    let opts = CompileOptions { allow_unproven: allow_unproven != 0, hrp };
     let result = compile(source, args, target, opts);
     let json = result_to_json(&result, source, args);
     pack(&json)

@@ -76,6 +76,17 @@ fn print_output(
     }
 }
 
+/// The bech32m HRP for a `--network` name. Mainnet is the default; signet and
+/// testnet share `tb`, as they do in Core.
+fn hrp_for(network: &str) -> Option<&'static str> {
+    match network {
+        "mainnet" => Some("bc"),
+        "testnet" | "signet" => Some("tb"),
+        "regtest" => Some("bcrt"),
+        _ => None,
+    }
+}
+
 /// Loud reminder, printed to stderr whenever the CLI emits or re-derives a real
 /// mainnet address (`--address`, `--lock`, `--verify`). "Proven" means proven
 /// against the source predicate by alpha, unaudited code; a compiler bug or a
@@ -120,6 +131,8 @@ output modes (choose at most one):
   --allow-unproven       emit a fundable address even if a leaf is not proven
                          over its full domain (prints a per-leaf warning; never
                          overrides a real divergence)
+  --network <name>       address network: mainnet (default), testnet, signet,
+                         or regtest (signet and testnet share the tb prefix)
   --version              print the compiler version
   -h, --help             print this help
 
@@ -140,6 +153,8 @@ fn main() -> ExitCode {
     let mut args_path: Option<String> = None;
     let mut verify_path: Option<String> = None;
     let mut allow_unproven = false;
+    let mut hrp: &'static str = "bc";
+    let mut network = String::from("mainnet");
     let mut i = 0;
     while i < argv.len() {
         match argv[i].as_str() {
@@ -172,6 +187,31 @@ fn main() -> ExitCode {
                 }
             }
             "--allow-unproven" => allow_unproven = true,
+            "--network" => {
+                i += 1;
+                match argv.get(i).map(String::as_str) {
+                    Some(n) => match hrp_for(n) {
+                        Some(h) => {
+                            hrp = h;
+                            network = n.to_string();
+                        }
+                        None => {
+                            eprintln!(
+                                "seal: error: unknown network `{n}` \
+                                 (expected mainnet, testnet, signet, or regtest)"
+                            );
+                            return ExitCode::from(2);
+                        }
+                    },
+                    None => {
+                        eprintln!(
+                            "seal: error: `--network` needs a name \
+                             (mainnet, testnet, signet, or regtest)"
+                        );
+                        return ExitCode::from(2);
+                    }
+                }
+            }
             "--args" => {
                 i += 1;
                 match argv.get(i) {
@@ -238,7 +278,7 @@ fn main() -> ExitCode {
         target,
         CompileOptions {
             allow_unproven,
-            hrp: "bc",
+            hrp,
         },
     );
 
@@ -341,9 +381,15 @@ fn main() -> ExitCode {
             }
         }
 
-        // A real mainnet address was just emitted, written, or re-derived.
+        // An address was just emitted, written, or re-derived. Only mainnet
+        // carries the fund-loss warning; a test-network address says so plainly
+        // so it is never mistaken for one that holds real value.
         if matches!(flag.as_deref(), Some("--address" | "--lock")) || verify_path.is_some() {
-            warn_mainnet_funding(color);
+            if hrp == "bc" {
+                warn_mainnet_funding(color);
+            } else {
+                eprintln!("note: this is a {network} address, not mainnet.");
+            }
         }
     }
 

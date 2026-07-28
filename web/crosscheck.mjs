@@ -52,13 +52,16 @@ for (const name of names) {
   const source = readFileSync(bsFile, "utf8");
   const args = readFileSync(argsFile, "utf8");
 
-  // Native: `seal <bs> --args <args> --json` -> JSON on stdout (exits 0).
-  const native = execFileSync(seal, [bsFile, "--args", argsFile, "--json"], {
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-  }).trim();
+  // Native: `seal <bs> --args <args> --json` -> JSON on stdout (exits 0). Both
+  // sides target testnet because the wasm build cannot encode mainnet at all;
+  // comparing like for like keeps this a codegen check, not a network check.
+  const native = execFileSync(
+    seal,
+    [bsFile, "--args", argsFile, "--network", "testnet", "--json"],
+    { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+  ).trim();
   // Wasm: the same pipeline, in a JS runtime.
-  const wasm = bs.compileJson(source, { args, target: "fund" }).trim();
+  const wasm = bs.compileJson(source, { args, target: "fund", network: "testnet" }).trim();
 
   if (native === wasm) {
     const obj = JSON.parse(wasm);

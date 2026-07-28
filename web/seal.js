@@ -8,7 +8,8 @@
 // Usage:
 //   import { Seal } from "./seal.js";
 //   const bs = await Seal.load("./seal_wasm.wasm");   // path | Response | bytes
-//   const r = bs.compile(source, { args, target: "fund", allowUnproven: false });
+//   const r = bs.compile(source, { args, target: "fund", allowUnproven: false,
+//                                  network: "testnet" });  // or signet | regtest
 //   if (r.ok) console.log(r.address); else console.log(r.diagnostics);
 //
 // `compile` returns the parsed result object:
@@ -19,6 +20,10 @@
 // Optional keys are present only when the pipeline produced them.
 
 const TARGETS = { check: 0, lower: 1, certify: 2, cost: 3, fund: 4 };
+// Test networks only: the wasm build cannot encode a mainnet address, and an
+// unknown name falls back to testnet rather than mainnet (see seal-wasm).
+// Signet and testnet share the `tb` prefix, as they do in Core.
+const NETWORKS = { testnet: 0, signet: 0, regtest: 1 };
 
 export class Seal {
   constructor(instance) {
@@ -59,13 +64,13 @@ export class Seal {
   // to `seal --json` for the same input (both call the same result_to_json), so
   // it is the seal for the native/wasm cross-check.
   compileJson(source, opts = {}) {
-    const { args = null, target = "fund", allowUnproven = false } = opts;
+    const { args = null, target = "fund", allowUnproven = false, network = "testnet" } = opts;
     const t = TARGETS[target] ?? TARGETS.fund;
     const src = this._writeString(source);
     const a = args == null ? { ptr: 0, len: 0 } : this._writeString(args);
 
     const out = this.exports.bs_compile(
-      src.ptr, src.len, a.ptr, a.len, t, allowUnproven ? 1 : 0,
+      src.ptr, src.len, a.ptr, a.len, t, allowUnproven ? 1 : 0, NETWORKS[network] ?? NETWORKS.testnet,
     );
     if (out === 0) throw new Error("seal: compile returned null (allocation failed)");
 
