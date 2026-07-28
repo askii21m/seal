@@ -3,3 +3,6 @@
 .DS_Store
 .idea/
 *.rs.bk
+
+# Local tooling (launch configs, agent scratch); never ships.
+.claude/
