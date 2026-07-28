@@ -29,6 +29,14 @@ pub fn spend_descriptor(spend: &Spend, env: &Env) -> Option<String> {
     {
         return Some(d);
     }
+    // `hoist_timelock_to_tail` only fires when some non-verify-only item can
+    // become the leaf's result. With nothing but timelocks there is no such item,
+    // so the leaf keeps its `<t> CLTV DROP 1` form, which is not a Miniscript
+    // fragment: emitting `after(t)` here would name a DIFFERENT script, and so a
+    // different address, than the one this contract funds.
+    if items.iter().all(is_verify_only_item) {
+        return None;
+    }
     // Canonical order: tail-rank, then the last timelock hoisted to the tail (the
     // optimizer's trailing-CSV/CLTV), mirroring `lower` + `hoist_timelock_to_tail`.
     let mut ordered: Vec<&Expr> = items.iter().collect();

@@ -408,3 +408,24 @@ fn nums_internal_key_is_deterministic_and_disclosed() {
     let p = h + (generator() * U256::from_be_bytes(&r1));
     assert_eq!(p.x_bytes().unwrap(), k1);
 }
+
+/// A `@depth(0)` pin takes the root and leaves no open position, so any other
+/// spend cannot be placed. That has to be an error rather than a panic: the
+/// splitting loop needs a slot to split, and there is none. (Regression: this
+/// reached `slots.remove(0)` on an empty vec and aborted the compiler.)
+#[test]
+fn depth_pin_that_fills_the_tree_errors_rather_than_panics() {
+    let err = plan_tree(&[req(0, Some(0), 1), req(1, None, 1)])
+        .expect_err("a root pin plus another spend cannot be laid out");
+    assert!(
+        err.contains("fill the tree"),
+        "expected a layout error naming the full tree, got: {err}"
+    );
+
+    // Same shape with several unpinned spends waiting.
+    assert!(plan_tree(&[req(0, Some(0), 1), req(1, None, 1), req(2, None, 1)]).is_err());
+
+    // The pin is only unsatisfiable because it is the ROOT: at depth 1 it leaves
+    // a sibling position, so this must still lay out.
+    assert!(plan_tree(&[req(0, Some(1), 1), req(1, None, 1)]).is_ok());
+}

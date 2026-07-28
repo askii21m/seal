@@ -227,3 +227,53 @@ fn contract_tr_descriptor_is_the_full_taproot() {
         );
     }
 }
+
+#[test]
+fn timelock_only_spend_emits_no_descriptor() {
+    // `hoist_timelock_to_tail` only fires when a non-verify-only item can become
+    // the leaf's result, so a spend that is nothing but timelocks keeps its
+    // `<t> CLTV DROP 1` form. Miniscript's `after(t)` is `<t> CLTV`, which is
+    // DIFFERENT bytes and therefore a different address: the emitter must refuse
+    // to name one. (Regression: it emitted `after(t)` for this shape.)
+    let src = "contract T { extern const t: LockTime.Absolute;
+        open spend late() { require after(t); } keypath None; }";
+    let result = compile(
+        src,
+        Some(r#"{"t":{"height":800000}}"#),
+        Target::Fund,
+        CompileOptions::default(),
+    );
+    assert_eq!(
+        result.descriptors.clone().expect("lowered"),
+        vec![None],
+        "a timelock-only leaf is not Miniscript, so it must emit no descriptor"
+    );
+    // The contract-level tr() must be withheld too.
+    let json = result_to_json(&result, src, Some(r#"{"t":{"height":800000}}"#));
+    assert!(
+        !json.contains("\"descriptor\":\"tr("),
+        "the contract tr() must be withheld when a leaf is not expressible"
+    );
+    // The contract itself is still perfectly valid and fundable.
+    assert!(
+        result.assembled.is_some(),
+        "the address must still be emitted"
+    );
+
+    // A timelock WITH a signature does hoist, so that shape keeps its descriptor.
+    let with_sig = "contract T { extern const t: LockTime.Absolute; extern const k: PublicKey;
+        spend late(s: Signature) { require { after(t), k.check(s) } } keypath None; }";
+    let args = r#"{"t":{"height":800000},"k":"0x2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c"}"#;
+    let ok = compile(
+        with_sig,
+        Some(args),
+        Target::Fund,
+        CompileOptions::default(),
+    );
+    let d = ok.descriptors.expect("lowered");
+    assert!(
+        d[0].as_deref()
+            .is_some_and(|s| s.ends_with("after(800000))")),
+        "a hoisted timelock still ends the descriptor, got {d:?}"
+    );
+}

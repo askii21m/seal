@@ -214,6 +214,15 @@ fn assign_depths(reqs: &[LeafReq]) -> Result<Vec<(usize, u32)>, String> {
         }
         return Ok(out);
     }
+    // The mirror of the case above: the pins consumed every position, but there
+    // are still spends to place. Splitting needs a slot to split, so this has to
+    // be caught here rather than in the loop below.
+    if slots.is_empty() {
+        return Err(format!(
+            "the pinned depths already fill the tree, leaving no position for {u} unpinned \
+             spend(s): every spend needs one (Kraft sum of 2^-d would exceed 1)"
+        ));
+    }
     if u < slots.len() {
         return Err(format!(
             "the pinned depths leave {} open positions but only {u} unpinned spend(s) remain to \
