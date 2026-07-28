@@ -77,9 +77,18 @@ pub extern "C" fn bs_compile(
     allow_unproven: u32,
     network: u32,
 ) -> *mut u8 {
-    let source = match unsafe { read_str(src_ptr, src_len) } {
-        Some(s) => s,
-        None => return pack(r#"{"ok":false,"error":"source is not valid UTF-8"}"#),
+    // An empty source is ordinary input, not an error: a caller has no buffer to
+    // allocate for it and passes a null pointer, so accept that as "" and let the
+    // compiler answer with real diagnostics. Returning an error object here
+    // instead would omit the `diagnostics` field an editor expects on every
+    // response, which is a much worse failure than an empty file.
+    let source = if src_ptr.is_null() && src_len == 0 {
+        ""
+    } else {
+        match unsafe { read_str(src_ptr, src_len) } {
+            Some(s) => s,
+            None => return pack(r#"{"ok":false,"error":"source is not valid UTF-8"}"#),
+        }
     };
     let args = if args_ptr.is_null() {
         None
