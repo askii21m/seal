@@ -218,6 +218,16 @@ fn assign_depths(reqs: &[LeafReq]) -> Result<Vec<(usize, u32)>, String> {
     // are still spends to place. Splitting needs a slot to split, so this has to
     // be caught here rather than in the loop below.
     if slots.is_empty() {
+        // `@depth(0)` is the case worth naming outright: depth 0 IS the whole
+        // tree, so it can only ever be the only spend, and the general Kraft
+        // wording does not make that obvious.
+        if pinned.iter().any(|r| r.depth == Some(0)) {
+            return Err(format!(
+                "`@depth(0)` puts that spend at the root, which is the entire tree, so the \
+                 remaining {u} spend(s) have nowhere to go: use `@depth(1)` or deeper when a \
+                 contract has more than one spend"
+            ));
+        }
         return Err(format!(
             "the pinned depths already fill the tree, leaving no position for {u} unpinned \
              spend(s): every spend needs one (Kraft sum of 2^-d would exceed 1)"

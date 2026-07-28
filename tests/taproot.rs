@@ -418,8 +418,16 @@ fn depth_pin_that_fills_the_tree_errors_rather_than_panics() {
     let err = plan_tree(&[req(0, Some(0), 1), req(1, None, 1)])
         .expect_err("a root pin plus another spend cannot be laid out");
     assert!(
-        err.contains("fill the tree"),
-        "expected a layout error naming the full tree, got: {err}"
+        err.contains("@depth(0)") && err.contains("entire tree"),
+        "a root pin should say what depth 0 means, got: {err}"
+    );
+
+    // A deeper pin that still overfills keeps the general explanation.
+    let general = plan_tree(&[req(0, Some(1), 1), req(1, Some(1), 1), req(2, None, 1)])
+        .expect_err("two depth-1 pins fill the tree, so a third spend cannot be placed");
+    assert!(
+        general.contains("fill the tree"),
+        "expected the general layout error, got: {general}"
     );
 
     // Same shape with several unpinned spends waiting.
